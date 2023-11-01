@@ -2,7 +2,6 @@ package certgraphanalysis
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"github.com/openshift/api/annotations"
@@ -15,11 +14,19 @@ import (
 )
 
 func GatherCertsFromAllNamespaces(ctx context.Context, kubeClient kubernetes.Interface, options ...*certGenerationOptions) (*certgraphapi.PKIList, error) {
-	return gatherFilteredCerts(ctx, kubeClient, allConfigMaps, allSecrets, options)
+	optionsList, err := NewCertGenerationOptionList(ctx, kubeClient, options)
+	if err != nil {
+		return nil, err
+	}
+	return gatherFilteredCerts(ctx, kubeClient, allConfigMaps, allSecrets, *optionsList)
 }
 
 func GatherCertsFromPlatformNamespaces(ctx context.Context, kubeClient kubernetes.Interface, options ...*certGenerationOptions) (*certgraphapi.PKIList, error) {
-	return gatherFilteredCerts(ctx, kubeClient, platformConfigMaps, platformSecrets, options)
+	optionsList, err := NewCertGenerationOptionList(ctx, kubeClient, options)
+	if err != nil {
+		return nil, err
+	}
+	return gatherFilteredCerts(ctx, kubeClient, platformConfigMaps, platformSecrets, *optionsList)
 }
 
 var wellKnownPlatformNamespaces = sets.NewString(
@@ -41,6 +48,7 @@ func isPlatformNamespace(nsName string) bool {
 }
 
 type configMapFilterFunc func(configMap *corev1.ConfigMap) bool
+type configMapRewriteFunc func(configMap *corev1.ConfigMap, nodes map[string]int) (string, string)
 
 func allConfigMaps(_ *corev1.ConfigMap) bool {
 	return true
@@ -49,7 +57,8 @@ func platformConfigMaps(obj *corev1.ConfigMap) bool {
 	return isPlatformNamespace(obj.Namespace)
 }
 
-type secretFilterFunc func(configMap *corev1.Secret) bool
+type secretFilterFunc func(secret *corev1.Secret) bool
+type secretRewriteFunc func(secret *corev1.Secret, nodes map[string]int) (string, string)
 
 func allSecrets(_ *corev1.Secret) bool {
 	return true
@@ -63,14 +72,6 @@ func gatherFilteredCerts(ctx context.Context, kubeClient kubernetes.Interface, a
 	certs := []*certgraphapi.CertKeyPair{}
 	caBundles := []*certgraphapi.CertificateAuthorityBundle{}
 	errs := []error{}
-	nodes := map[string]int{}
-	nodeList, err := kubeClient.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to list cluster nodes: %v", err)
-	}
-	for i, node := range nodeList.Items {
-		nodes[node.Name] = i
-	}
 
 	// TODO here is the point where need to collect data like node names and IPs that need to be replaced
 	//  this will be something like options.Discovery(kubeClient, configClient).
@@ -87,28 +88,28 @@ func gatherFilteredCerts(ctx context.Context, kubeClient kubernetes.Interface, a
 			if options.rejectConfigMap(&configMap) {
 				continue
 			}
-
-			details, err := InspectConfigMap(&configMap)
-			if details != nil {
-				// TODO something like options.RewriteCABundleDetails(details) (details, namespace, name)
-				//  this will allow us to rewrite node names and IP values
-				caBundles = append(caBundles, details)
-
-				inClusterResourceData.CertificateAuthorityBundles = append(inClusterResourceData.CertificateAuthorityBundles,
-					certgraphapi.PKIRegistryInClusterCABundle{
-						ConfigMapLocation: certgraphapi.InClusterConfigMapLocation{
-							Namespace: configMap.Namespace,
-							Name:      configMap.Name,
-						},
-						CABundleInfo: certgraphapi.PKIRegistryCertificateAuthorityInfo{
-							OwningJiraComponent: configMap.Annotations[annotations.OpenShiftComponent],
-							Description:         configMap.Annotations[annotations.OpenShiftDescription],
-						},
-					})
-			}
+			name, namespace := options.rewriteConfigMap(&configMap)
+			details, err := InspectConfigMap(&configMap, name, namespace)
 			if err != nil {
 				errs = append(errs, err)
+				continue
 			}
+			if details == nil {
+				continue
+			}
+			caBundles = append(caBundles, details)
+
+			inClusterResourceData.CertificateAuthorityBundles = append(inClusterResourceData.CertificateAuthorityBundles,
+				certgraphapi.PKIRegistryInClusterCABundle{
+					ConfigMapLocation: certgraphapi.InClusterConfigMapLocation{
+						Namespace: namespace,
+						Name:      name,
+					},
+					CABundleInfo: certgraphapi.PKIRegistryCertificateAuthorityInfo{
+						OwningJiraComponent: configMap.Annotations[annotations.OpenShiftComponent],
+						Description:         configMap.Annotations[annotations.OpenShiftDescription],
+					},
+				})
 		}
 	}
 
@@ -125,35 +126,36 @@ func gatherFilteredCerts(ctx context.Context, kubeClient kubernetes.Interface, a
 				continue
 			}
 
-			details, err := InspectSecret(&secret)
-			if details != nil {
-				// TODO something like options.RewriteCertKeyPairDetails(details) (details, namespace, name)
-				//  this will allow us to rewrite node names and IP values
-				certs = append(certs, details)
-
-				inClusterResourceData.CertKeyPairs = append(inClusterResourceData.CertKeyPairs,
-					certgraphapi.PKIRegistryInClusterCertKeyPair{
-						SecretLocation: certgraphapi.InClusterSecretLocation{
-							Namespace: secret.Namespace,
-							Name:      secret.Name,
-						},
-						CertKeyInfo: certgraphapi.PKIRegistryCertKeyPairInfo{
-							OwningJiraComponent: secret.Annotations[annotations.OpenShiftComponent],
-							Description:         secret.Annotations[annotations.OpenShiftDescription],
-						},
-					})
-			}
+			name, namespace := options.rewriteSecret(&secret)
+			details, err := InspectSecret(&secret, name, namespace)
 			if err != nil {
 				errs = append(errs, err)
+				continue
 			}
+			if details == nil {
+				continue
+			}
+			certs = append(certs, details)
+
+			inClusterResourceData.CertKeyPairs = append(inClusterResourceData.CertKeyPairs,
+				certgraphapi.PKIRegistryInClusterCertKeyPair{
+					SecretLocation: certgraphapi.InClusterSecretLocation{
+						Namespace: namespace,
+						Name:      name,
+					},
+					CertKeyInfo: certgraphapi.PKIRegistryCertKeyPairInfo{
+						OwningJiraComponent: secret.Annotations[annotations.OpenShiftComponent],
+						Description:         secret.Annotations[annotations.OpenShiftDescription],
+					},
+				})
 		}
 	}
 
-	pkiList := PKIListFromParts(ctx, inClusterResourceData, certs, caBundles, nodes)
+	pkiList := PKIListFromParts(ctx, inClusterResourceData, certs, caBundles)
 	return pkiList, errors.NewAggregate(errs)
 }
 
-func PKIListFromParts(ctx context.Context, inClusterResourceData *certgraphapi.PerInClusterResourceData, certs []*certgraphapi.CertKeyPair, caBundles []*certgraphapi.CertificateAuthorityBundle, nodes map[string]int) *certgraphapi.PKIList {
+func PKIListFromParts(ctx context.Context, inClusterResourceData *certgraphapi.PerInClusterResourceData, certs []*certgraphapi.CertKeyPair, caBundles []*certgraphapi.CertificateAuthorityBundle) *certgraphapi.PKIList {
 	certs = deduplicateCertKeyPairs(certs)
 	certList := &certgraphapi.CertKeyPairList{}
 	for i := range certs {
