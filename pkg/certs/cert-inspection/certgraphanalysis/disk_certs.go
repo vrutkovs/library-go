@@ -6,11 +6,15 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
-	"strings"
+	"syscall"
+
+	"github.com/opencontainers/runc/libcontainer/user"
+	"github.com/opencontainers/selinux/go-selinux"
 
 	"github.com/openshift/library-go/pkg/certs/cert-inspection/certgraphapi"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -100,7 +104,9 @@ func parseBlockAsCertificate(certificates []*x509.Certificate, path, prefix stri
 	}
 	detail.Spec.OnDiskLocations = []certgraphapi.OnDiskCertKeyPairLocation{
 		{
-			Cert: buildOnDiskLocationFromPath(path, prefix),
+			Cert: certgraphapi.OnDiskLocation{
+				Path: path,
+			},
 		}}
 	return detail, nil
 }
@@ -111,7 +117,9 @@ func parseBlockAsRSAPrivateKey(key *rsa.PrivateKey, path, prefix string) *certgr
 			SecretLocations: nil,
 			OnDiskLocations: []certgraphapi.OnDiskCertKeyPairLocation{
 				{
-					Key: buildOnDiskLocationFromPath(path, prefix),
+					Key: certgraphapi.OnDiskLocation{
+						Path: path,
+					},
 				}},
 			CertMetadata: certgraphapi.CertKeyMetadata{
 				CertIdentifier: certgraphapi.CertIdentifier{
@@ -128,7 +136,9 @@ func parseBlockAsECDSAPrivateKey(key *ecdsa.PrivateKey, path, prefix string) *ce
 			SecretLocations: nil,
 			OnDiskLocations: []certgraphapi.OnDiskCertKeyPairLocation{
 				{
-					Key: buildOnDiskLocationFromPath(path, prefix),
+					Key: certgraphapi.OnDiskLocation{
+						Path: path,
+					},
 				}},
 			CertMetadata: certgraphapi.CertKeyMetadata{
 				CertIdentifier: certgraphapi.CertIdentifier{
@@ -187,7 +197,9 @@ func parseFileAsCA(path, prefix, dir string) (*certgraphapi.CertificateAuthority
 		return detail, err
 	}
 
-	detail.Spec.OnDiskLocations = []certgraphapi.OnDiskLocation{buildOnDiskLocationFromPath(path, prefix)}
+	detail.Spec.OnDiskLocations = []certgraphapi.OnDiskLocation{certgraphapi.OnDiskLocation{
+		Path: path,
+	}}
 	return detail, nil
 }
 
@@ -209,8 +221,8 @@ func gatherCABundlesFromDisk(ctx context.Context, prefix, dir string, options ce
 		}
 		fmt.Fprintf(os.Stdout, "Checking if %s is a CA bundle.\n", path)
 		if detail, err := parseFileAsCA(path, prefix, dir); err == nil && detail != nil {
-			options.rewriteCABundle(metav1.ObjectMeta{}, detail)
 			fmt.Fprintf(os.Stdout, "Found CA bundle in %s.\n", path)
+			options.rewriteCABundle(metav1.ObjectMeta{}, detail)
 			ret = append(ret, detail)
 			return nil
 		}
@@ -219,10 +231,22 @@ func gatherCABundlesFromDisk(ctx context.Context, prefix, dir string, options ce
 	return ret, err
 }
 
-func buildOnDiskLocationFromPath(path, prefix string) certgraphapi.OnDiskLocation {
-	pathWithoutPrefix := strings.Replace(path, prefix, "", 1)
-	return certgraphapi.OnDiskLocation{
-		Path: pathWithoutPrefix,
-		// TODO[vrutkovs]: fill in other settings
+func updateOnDiskLocationMetadata(in *certgraphapi.OnDiskLocationWithMetadata) {
+	// Get permissions and uid/gid (omit if error occured)
+	if info, err := os.Stat(in.Path); err == nil {
+		in.Permissions = info.Mode().Perm().String()
+		if statt, ok := info.Sys().(*syscall.Stat_t); ok {
+			if u, err := user.LookupUid(int(statt.Uid)); err == nil {
+				in.User = u.Name
+			}
+			if g, err := user.LookupGid(int(statt.Gid)); err == nil {
+				in.Group = g.Name
+			}
+		}
+	}
+
+	// Get selinux label (omit if error occured)
+	if label, err := selinux.FileLabel(in.Path); err == nil {
+		in.SELinuxOptions = label
 	}
 }
