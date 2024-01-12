@@ -2,6 +2,8 @@ package certgraphanalysis
 
 import (
 	"fmt"
+	"os"
+	"regexp"
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,10 +27,11 @@ type metadataOptions struct {
 }
 
 var (
-	_ configMapRewriter           = &metadataOptions{}
-	_ secretRewriter              = &metadataOptions{}
-	_ caBundleMetadataRewriter    = &metadataOptions{}
-	_ certKeypairMetadataRewriter = &metadataOptions{}
+	_                    configMapRewriter           = &metadataOptions{}
+	_                    secretRewriter              = &metadataOptions{}
+	_                    caBundleMetadataRewriter    = &metadataOptions{}
+	_                    certKeypairMetadataRewriter = &metadataOptions{}
+	revisionedPathReg, _                             = regexp.Compile(`-\d+$`)
 )
 
 func (*metadataOptions) approved() {}
@@ -99,7 +102,49 @@ var (
 			}
 		},
 	}
+	SkipRevisionedLocations = &metadataOptions{
+		rewriteCABundleFn: func(metadata metav1.ObjectMeta, caBundle *certgraphapi.CertificateAuthorityBundle) {
+			locations := []certgraphapi.OnDiskLocation{}
+			for _, loc := range caBundle.Spec.OnDiskLocations {
+				if skipRevisionedInOnDiskLocation(loc) {
+					continue
+				}
+				locations = append(locations, loc)
+			}
+			caBundle.Spec.OnDiskLocations = locations
+		},
+		rewriteCertKeyPairFn: func(metadata metav1.ObjectMeta, certKeyPair *certgraphapi.CertKeyPair) {
+			locations := []certgraphapi.OnDiskCertKeyPairLocation{}
+			for _, loc := range certKeyPair.Spec.OnDiskLocations {
+				// If either of cert or key is revisioned skip the entire location
+				if len(loc.Cert.Path) != 0 && skipRevisionedInOnDiskLocation(loc.Cert) {
+					continue
+				}
+				if len(loc.Key.Path) != 0 && skipRevisionedInOnDiskLocation(loc.Key) {
+					continue
+				}
+				locations = append(locations, loc)
+			}
+			certKeyPair.Spec.OnDiskLocations = locations
+		},
+	}
 )
+
+// skipRevisionedInOnDiskLocation returns true if location is for revisioned certificate and needs to be skipped
+func skipRevisionedInOnDiskLocation(location certgraphapi.OnDiskLocation) bool {
+	if len(location.Path) == 0 {
+		fmt.Fprintf(os.Stdout, "Skipping %s: empty path\n", location.Path)
+		return true
+	}
+	parts := strings.Split(location.Path, "/")
+	for _, part := range parts {
+		if revisionedPathReg.MatchString(part) {
+			fmt.Fprintf(os.Stdout, "Skipping %s: matched regexp in %s\n", location.Path, part)
+			return true
+		}
+	}
+	return false
+}
 
 func RewriteNodeIPs(nodeList []*corev1.Node) *metadataOptions {
 	nodes := map[string]int{}
