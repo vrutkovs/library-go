@@ -21,6 +21,8 @@ import (
 	"k8s.io/client-go/util/cert"
 )
 
+var errIsCA = fmt.Errorf("not certificate but a CA")
+
 func gatherSecretsFromDisk(ctx context.Context, prefix, dir string, options certGenerationOptionList) ([]*certgraphapi.CertKeyPair, error) {
 	ret := []*certgraphapi.CertKeyPair{}
 	parentDir := filepath.Join(prefix, dir)
@@ -64,7 +66,10 @@ func parseBlockAsTLSArtifact(path, prefix string, bytes []byte) (*certgraphapi.C
 			return nil, rest, err
 		}
 		detail, err := parseBlockAsCertificate(certificates, path, prefix)
-		if err != nil {
+		if errors.Is(err, errIsCA) {
+			// Stop processing the certificate - block found to be a CA and it can't be mixed
+			return nil, []byte{}, err
+		} else if err != nil {
 			return nil, rest, err
 		}
 		fmt.Fprintf(os.Stdout, "Found valid certificate in %s \n", path)
@@ -95,7 +100,7 @@ func parseBlockAsCertificate(certificates []*x509.Certificate, path, prefix stri
 	certificate := certificates[0]
 	if certificate.IsCA {
 		// This is a CA
-		return nil, fmt.Errorf("not certificate but a CA")
+		return nil, errIsCA
 	}
 
 	detail, err := toCertKeyPair(certificate)
