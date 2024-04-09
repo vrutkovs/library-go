@@ -18,6 +18,7 @@ import (
 	"k8s.io/client-go/util/cert"
 	"k8s.io/klog/v2"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/openshift/library-go/pkg/certs"
 	"github.com/openshift/library-go/pkg/crypto"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -75,7 +76,15 @@ func (c CABundleConfigMap) EnsureConfigMapCABundle(ctx context.Context, signingC
 		return nil, err
 	}
 	if originalCABundleConfigMap == nil || originalCABundleConfigMap.Data == nil || !equality.Semantic.DeepEqual(originalCABundleConfigMap.Data, caBundleConfigMap.Data) {
-		c.EventRecorder.Eventf("CABundleUpdateRequired", "%q in %q requires a new cert", c.Name, c.Namespace)
+		reason := ""
+		if originalCABundleConfigMap == nil {
+			reason = "configmap doesn't exist"
+		} else if originalCABundleConfigMap.Data == nil {
+			reason = "configmap is empty"
+		} else if !equality.Semantic.DeepEqual(originalCABundleConfigMap.Data, caBundleConfigMap.Data) {
+			reason = fmt.Sprintf("diff: %q", cmp.Diff(originalCABundleConfigMap.Data, caBundleConfigMap.Data))
+		}
+		c.EventRecorder.Eventf("CABundleUpdateRequired", "%q in %q requires a new cert: %s", c.Name, c.Namespace, reason)
 		LabelAsManagedConfigMap(caBundleConfigMap, CertificateTypeCABundle)
 
 		actualCABundleConfigMap, modified, err := resourceapply.ApplyConfigMap(ctx, c.Client, c.EventRecorder, caBundleConfigMap)

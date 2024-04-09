@@ -146,7 +146,12 @@ func (c RotatedSelfSignedCertKeySecret) EnsureTargetCertKeyPair(ctx context.Cont
 	return targetCertKeyPairSecret, nil
 }
 
-func needNewTargetCertKeyPair(annotations map[string]string, signer *crypto.CA, caBundleCerts []*x509.Certificate, refresh time.Duration, refreshOnlyWhenExpired bool) string {
+func needNewTargetCertKeyPair(secret *corev1.Secret, signer *crypto.CA, caBundleCerts []*x509.Certificate, refresh time.Duration, refreshOnlyWhenExpired bool) string {
+	if secret.ResourceVersion == "" {
+		return "secret doesn't exist"
+	}
+
+	annotations := secret.Annotations
 	if reason := needNewTargetCertKeyPairForTime(annotations, signer, refresh, refreshOnlyWhenExpired); len(reason) > 0 {
 		return reason
 	}
@@ -264,7 +269,7 @@ func (r *ClientRotation) NewCertificate(signer *crypto.CA, validity time.Duratio
 }
 
 func (r *ClientRotation) NeedNewTargetCertKeyPair(currentCertSecret *corev1.Secret, signer *crypto.CA, caBundleCerts []*x509.Certificate, refresh time.Duration, refreshOnlyWhenExpired bool) string {
-	return needNewTargetCertKeyPair(currentCertSecret.Annotations, signer, caBundleCerts, refresh, refreshOnlyWhenExpired)
+	return needNewTargetCertKeyPair(currentCertSecret, signer, caBundleCerts, refresh, refreshOnlyWhenExpired)
 }
 
 func (r *ClientRotation) SetAnnotations(cert *crypto.TLSCertificateConfig, annotations map[string]string) map[string]string {
@@ -289,7 +294,7 @@ func (r *ServingRotation) RecheckChannel() <-chan struct{} {
 }
 
 func (r *ServingRotation) NeedNewTargetCertKeyPair(currentCertSecret *corev1.Secret, signer *crypto.CA, caBundleCerts []*x509.Certificate, refresh time.Duration, refreshOnlyWhenExpired bool) string {
-	reason := needNewTargetCertKeyPair(currentCertSecret.Annotations, signer, caBundleCerts, refresh, refreshOnlyWhenExpired)
+	reason := needNewTargetCertKeyPair(currentCertSecret, signer, caBundleCerts, refresh, refreshOnlyWhenExpired)
 	if len(reason) > 0 {
 		return reason
 	}
@@ -335,7 +340,7 @@ func (r *SignerRotation) NewCertificate(signer *crypto.CA, validity time.Duratio
 }
 
 func (r *SignerRotation) NeedNewTargetCertKeyPair(currentCertSecret *corev1.Secret, signer *crypto.CA, caBundleCerts []*x509.Certificate, refresh time.Duration, refreshOnlyWhenExpired bool) string {
-	return needNewTargetCertKeyPair(currentCertSecret.Annotations, signer, caBundleCerts, refresh, refreshOnlyWhenExpired)
+	return needNewTargetCertKeyPair(currentCertSecret, signer, caBundleCerts, refresh, refreshOnlyWhenExpired)
 }
 
 func (r *SignerRotation) SetAnnotations(cert *crypto.TLSCertificateConfig, annotations map[string]string) map[string]string {
