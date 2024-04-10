@@ -467,7 +467,7 @@ func applySecretImproved(ctx context.Context, client coreclientv1.SecretsGetter,
 	}
 
 	// if the field was immutable on a secret, we're going to be stuck until we delete it.  Try to delete and then create
-	deleteErr := client.Secrets(required.Namespace).Delete(ctx, existingCopy.Name, metav1.DeleteOptions{})
+	deleteErr := client.Secrets(required.Namespace).Delete(ctx, existingCopy.Name, metav1.DeleteOptions{Preconditions: &metav1.Preconditions{ResourceVersion: &existing.ResourceVersion}})
 	reportDeleteEvent(recorder, existingCopy, deleteErr)
 
 	// clear the RV and track the original actual and error for the return like our create value.
