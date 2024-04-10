@@ -16,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	coreapplyv1 "k8s.io/client-go/applyconfigurations/core/v1"
 	coreclientv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
@@ -455,7 +456,9 @@ func applySecretImproved(ctx context.Context, client coreclientv1.SecretsGetter,
 	}
 
 	if existingCopy.Type == existing.Type {
-		actual, err = client.Secrets(required.Namespace).Update(ctx, existingCopy, metav1.UpdateOptions{})
+		existingCopyConfiguration, err := coreapplyv1.ExtractSecret(existingCopy, "library-go")
+		reportUpdateEvent(recorder, existingCopy, err)
+		actual, err = client.Secrets(required.Namespace).Apply(ctx, existingCopyConfiguration, metav1.ApplyOptions{})
 		reportUpdateEvent(recorder, existingCopy, err)
 
 		if err == nil {
