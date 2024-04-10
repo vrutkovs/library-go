@@ -208,7 +208,7 @@ func needNewTargetCertKeyPairForTime(annotations map[string]string, signer *cryp
 	validity := notAfter.Sub(notBefore)
 	at80Percent := notAfter.Add(-validity / 5)
 	if time.Now().After(at80Percent) {
-		return fmt.Sprintf("past its latest possible time %v", at80Percent)
+		return fmt.Sprintf("past refresh time (80%% of validity): %v", at80Percent)
 	}
 
 	// If Certificate is past its refresh time, we may have action to take. We only do this if the signer is old enough.

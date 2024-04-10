@@ -158,7 +158,7 @@ func needNewSigningCertKeyPair(secret *corev1.Secret, refresh time.Duration, ref
 	validity := notAfter.Sub(notBefore)
 	at80Percent := notAfter.Add(-validity / 5)
 	if time.Now().After(at80Percent) {
-		return true, fmt.Sprintf("past its latest possible time %v", at80Percent)
+		return true, fmt.Sprintf("past refresh time (80%% of validity): %v", at80Percent)
 	}
 
 	developerSpecifiedRefresh := notBefore.Add(refresh)
