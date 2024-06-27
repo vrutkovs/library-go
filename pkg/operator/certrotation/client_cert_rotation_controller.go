@@ -3,6 +3,7 @@ package certrotation
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	operatorv1 "github.com/openshift/api/operator/v1"
@@ -159,7 +160,12 @@ func (c CertRotationController) Sync(ctx context.Context, syncCtx factory.SyncCo
 }
 
 func (c CertRotationController) getSigningCertKeyPairLocation() string {
-	return fmt.Sprintf("%s/%s", c.RotatedSelfSignedCertKeySecret.Namespace, c.RotatedSelfSignedCertKeySecret.Name)
+	result := ""
+	for _, secret := range c.RotatedTargetSecrets {
+		secret_tostring := fmt.Sprintf("%s/%s", secret.Namespace, secret.Name)
+		result = strings.Join([]string{result, secret_tostring}, ",")
+	}
+	return result
 }
 
 func (c CertRotationController) SyncWorker(ctx context.Context) error {

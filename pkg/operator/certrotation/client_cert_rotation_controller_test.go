@@ -38,7 +38,7 @@ func (f *fakeTargetCertCreator) NewCertificate(signer *crypto.CA, validity time.
 	return nil, nil
 }
 
-func (f *fakeTargetCertCreator) NeedNewTargetCertKeyPair(currentCertSecret *corev1.Secret, signer *crypto.CA, caBundleCerts []*x509.Certificate, refresh time.Duration, refreshOnlyWhenExpired bool) string {
+func (f *fakeTargetCertCreator) NeedNewTargetCertKeyPair(currentCertSecret *corev1.Secret, signer *crypto.CA, caBundleCerts []*x509.Certificate, refresh time.Duration, refreshOnlyWhenExpired, _ bool) string {
 	f.callCount += 1
 	return ""
 }
