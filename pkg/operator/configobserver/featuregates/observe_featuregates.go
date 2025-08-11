@@ -1,6 +1,7 @@
 package featuregates
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
@@ -37,7 +38,7 @@ type featureFlags struct {
 }
 
 // ObserveFeatureFlags fills in --feature-flags for the kube-apiserver
-func (f *featureFlags) ObserveFeatureFlags(genericListers configobserver.Listers, recorder events.Recorder, existingConfig map[string]interface{}) (map[string]interface{}, []error) {
+func (f *featureFlags) ObserveFeatureFlags(ctx context.Context, genericListers configobserver.Listers, recorder events.Recorder, existingConfig map[string]interface{}) (map[string]interface{}, []error) {
 	prunedExistingConfig := configobserver.Pruned(existingConfig, f.configPath)
 
 	errs := []error{}

@@ -179,7 +179,7 @@ func (c *defaultFeatureGateAccess) Run(ctx context.Context) {
 func (c *defaultFeatureGateAccess) syncHandler(ctx context.Context) error {
 	desiredVersion := c.desiredVersion
 	if c.missingVersionMarker == c.desiredVersion {
-		clusterVersion, err := c.clusterVersionLister.Get("version")
+		clusterVersion, err := c.clusterVersionLister.Get(ctx, "version")
 		if apierrors.IsNotFound(err) {
 			return nil // we will be re-triggered when it is created
 		}
@@ -193,7 +193,7 @@ func (c *defaultFeatureGateAccess) syncHandler(ctx context.Context) error {
 		}
 	}
 
-	featureGate, err := c.featureGateLister.Get("cluster")
+	featureGate, err := c.featureGateLister.Get(ctx, "cluster")
 	if apierrors.IsNotFound(err) {
 		return nil // we will be re-triggered when it is created
 	}

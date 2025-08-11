@@ -2,11 +2,12 @@ package featuregates
 
 import (
 	"errors"
-	clocktesting "k8s.io/utils/clock/testing"
 	"reflect"
 	"slices"
 	"testing"
 	"time"
+
+	clocktesting "k8s.io/utils/clock/testing"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -159,7 +160,7 @@ func TestObserveFeatureFlags(t *testing.T) {
 			initialExistingConfig := map[string]interface{}{}
 			observeFn := NewObserveFeatureFlagsFunc(tc.knownFeatures, tc.blacklistedFeatures, configPath, tc.accessor)
 
-			observed, errs := observeFn(nil, eventRecorder, initialExistingConfig)
+			observed, errs := observeFn(t.Context(), nil, eventRecorder, initialExistingConfig)
 			if len(errs) != 0 && !tc.expectError {
 				t.Fatal(errs)
 			}

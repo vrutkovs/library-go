@@ -6,6 +6,9 @@ import (
 	"sort"
 	"time"
 
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -23,6 +26,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/encryption/state"
 	"github.com/openshift/library-go/pkg/operator/encryption/statemachine"
 	"github.com/openshift/library-go/pkg/operator/events"
+	"github.com/openshift/library-go/pkg/operator/v1helpers"
 	operatorv1helpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 )
 
@@ -70,7 +74,7 @@ func NewPruneController(
 		secretClient:             secretClient,
 	}
 
-	return factory.New().ResyncEvery(time.Minute).WithSync(c.sync).WithControllerInstanceName(c.controllerInstanceName).WithInformers(
+	return factory.New().ResyncEvery(time.Minute).WithSync(c.sync).WithControllerInstanceName(c.controllerInstanceName).WithInformersQueueKeyFunc(v1helpers.ObjToString,
 		operatorClient.Informer(),
 		kubeInformersForNamespaces.InformersFor("openshift-config-managed").Core().V1().Secrets().Informer(),
 		apiServerConfigInformer.Informer(), // do not remove, used by the precondition checker
@@ -82,6 +86,13 @@ func NewPruneController(
 }
 
 func (c *pruneController) sync(ctx context.Context, syncCtx factory.SyncContext) (err error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "ckao.encryption.pruneController", trace.WithAttributes(
+		attribute.String("controllerInstanceName", c.controllerInstanceName),
+		attribute.String("aaaQueueKey", syncCtx.QueueKey()),
+	))
+	defer span.End()
+
 	// The status for this condition is intentionally omitted to ensure it's correctly set in each branch
 	degradedCondition := applyoperatorv1.OperatorCondition().
 		WithType("EncryptionPruneControllerDegraded")
@@ -96,7 +107,7 @@ func (c *pruneController) sync(ctx context.Context, syncCtx factory.SyncContext)
 		}
 	}()
 
-	if ready, err := shouldRunEncryptionController(c.operatorClient, c.preconditionsFulfilledFn, c.provider.ShouldRunEncryptionControllers); err != nil || !ready {
+	if ready, err := shouldRunEncryptionController(ctx, c.operatorClient, c.preconditionsFulfilledFn, c.provider.ShouldRunEncryptionControllers); err != nil || !ready {
 		if err != nil {
 			degradedCondition = nil
 
@@ -121,6 +132,10 @@ func (c *pruneController) sync(ctx context.Context, syncCtx factory.SyncContext)
 }
 
 func (c *pruneController) deleteOldMigratedSecrets(ctx context.Context, syncContext factory.SyncContext, encryptedGRs []schema.GroupResource) error {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "ckao.encryption.pruneController")
+	defer span.End()
+
 	_, desiredEncryptionConfig, _, isProgressingReason, err := statemachine.GetEncryptionConfigAndState(ctx, c.deployer, c.secretClient, c.encryptionSecretSelector, encryptedGRs)
 	if err != nil {
 		return err

@@ -89,7 +89,7 @@ func (c *OnePodPerNodeController) Name() string {
 
 func (c *OnePodPerNodeController) sync(ctx context.Context, syncContext factory.SyncContext) error {
 	klog.V(4).Infof("sync")
-	opSpec, _, _, err := c.operatorClient.GetOperatorState()
+	opSpec, _, _, err := c.operatorClient.GetOperatorState(ctx)
 	if apierrors.IsNotFound(err) && management.IsOperatorRemovable() {
 		return nil
 	}
@@ -107,7 +107,7 @@ func (c *OnePodPerNodeController) sync(ctx context.Context, syncContext factory.
 func (c *OnePodPerNodeController) syncManaged(ctx context.Context, syncContext factory.SyncContext) error {
 	klog.V(4).Infof("syncManaged")
 
-	matchingPods, err := c.podLister.Pods(c.namespace).List(c.podSelector)
+	matchingPods, err := c.podLister.Pods(c.namespace).List(ctx, c.podSelector)
 	if err != nil {
 		return err
 	}

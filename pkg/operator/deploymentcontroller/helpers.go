@@ -1,6 +1,7 @@
 package deploymentcontroller
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -13,10 +14,10 @@ import (
 // WithReplicasHook sets the deployment.Spec.Replicas field according to the number
 // of available nodes. The number of nodes is determined by the node
 // selector specified in the field deployment.Spec.Templates.NodeSelector.
-func WithReplicasHook(nodeLister corev1listers.NodeLister) DeploymentHookFunc {
-	return func(_ *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
+func WithReplicasHook(ctx context.Context, nodeLister corev1listers.NodeLister) DeploymentHookFunc {
+	return func(ctx context.Context, _ *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
 		nodeSelector := deployment.Spec.Template.Spec.NodeSelector
-		nodes, err := nodeLister.List(labels.SelectorFromSet(nodeSelector))
+		nodes, err := nodeLister.List(ctx, labels.SelectorFromSet(nodeSelector))
 		if err != nil {
 			return err
 		}
@@ -29,7 +30,7 @@ func WithReplicasHook(nodeLister corev1listers.NodeLister) DeploymentHookFunc {
 // WithImageHook sets the image associated with the deployment with the value provided
 // for CLI_IMAGE env variable.
 func WithImageHook() DeploymentHookFunc {
-	return func(_ *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
+	return func(ctx context.Context, _ *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
 		image := os.Getenv("CLI_IMAGE")
 		if image == "" {
 			return fmt.Errorf("CLI_IMAGE is not populated")

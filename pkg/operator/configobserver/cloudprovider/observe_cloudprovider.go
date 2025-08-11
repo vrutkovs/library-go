@@ -1,6 +1,8 @@
 package cloudprovider
 
 import (
+	"context"
+
 	corelisterv1 "k8s.io/client-go/listers/core/v1"
 
 	configlistersv1 "github.com/openshift/client-go/config/listers/config/v1"
@@ -39,7 +41,7 @@ type cloudProviderObserver struct {
 }
 
 // ObserveCloudProviderNames observes the cloud provider from the global cluster infrastructure resource.
-func (c *cloudProviderObserver) ObserveCloudProviderNames(genericListers configobserver.Listers, recorder events.Recorder, existingConfig map[string]interface{}) (ret map[string]interface{}, _ []error) {
+func (c *cloudProviderObserver) ObserveCloudProviderNames(ctx context.Context, genericListers configobserver.Listers, recorder events.Recorder, existingConfig map[string]interface{}) (ret map[string]interface{}, _ []error) {
 	listers := genericListers.(InfrastructureLister)
 	var errs []error
 

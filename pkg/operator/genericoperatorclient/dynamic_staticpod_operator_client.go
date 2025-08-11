@@ -18,6 +18,9 @@ import (
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/rest"
 	"k8s.io/utils/clock"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 )
 
 func NewStaticPodOperatorClient(clock clock.PassiveClock, config *rest.Config, gvr schema.GroupVersionResource, gvk schema.GroupVersionKind, extractApplySpec StaticPodOperatorSpecExtractorFunc, extractApplyStatus StaticPodOperatorStatusExtractorFunc) (v1helpers.StaticPodOperatorClient, dynamicinformer.DynamicSharedInformerFactory, error) {
@@ -30,22 +33,26 @@ func NewStaticPodOperatorClient(clock clock.PassiveClock, config *rest.Config, g
 		extractApplySpec, extractApplyStatus)
 }
 
-func (c dynamicOperatorClient) GetStaticPodOperatorState() (*operatorv1.StaticPodOperatorSpec, *operatorv1.StaticPodOperatorStatus, string, error) {
-	uncastInstance, err := c.informer.Lister().Get("cluster")
+func (c dynamicOperatorClient) GetStaticPodOperatorState(ctx context.Context) (*operatorv1.StaticPodOperatorSpec, *operatorv1.StaticPodOperatorStatus, string, error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "dynamicOperatorClient.GetStaticPodOperatorState")
+	defer span.End()
+
+	uncastInstance, err := c.informer.Lister().Get(ctx, "cluster")
 	if err != nil {
 		return nil, nil, "", err
 	}
 	instance := uncastInstance.(*unstructured.Unstructured)
 
-	return getStaticPodOperatorStateFromInstance(instance)
+	return getStaticPodOperatorStateFromInstance(ctx, instance)
 }
 
-func getStaticPodOperatorStateFromInstance(instance *unstructured.Unstructured) (*operatorv1.StaticPodOperatorSpec, *operatorv1.StaticPodOperatorStatus, string, error) {
-	spec, err := getStaticPodOperatorSpecFromUnstructured(instance.UnstructuredContent())
+func getStaticPodOperatorStateFromInstance(ctx context.Context, instance *unstructured.Unstructured) (*operatorv1.StaticPodOperatorSpec, *operatorv1.StaticPodOperatorStatus, string, error) {
+	spec, err := getStaticPodOperatorSpecFromUnstructured(ctx, instance.UnstructuredContent())
 	if err != nil {
 		return nil, nil, "", err
 	}
-	status, err := getStaticPodOperatorStatusFromUnstructured(instance.UnstructuredContent())
+	status, err := getStaticPodOperatorStatusFromUnstructured(ctx, instance.UnstructuredContent())
 	if err != nil {
 		return nil, nil, "", err
 	}
@@ -59,11 +66,15 @@ func (c dynamicOperatorClient) GetStaticPodOperatorStateWithQuorum(ctx context.C
 		return nil, nil, "", err
 	}
 
-	return getStaticPodOperatorStateFromInstance(instance)
+	return getStaticPodOperatorStateFromInstance(ctx, instance)
 }
 
 func (c dynamicOperatorClient) UpdateStaticPodOperatorSpec(ctx context.Context, resourceVersion string, spec *operatorv1.StaticPodOperatorSpec) (*operatorv1.StaticPodOperatorSpec, string, error) {
-	uncastOriginal, err := c.informer.Lister().Get("cluster")
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "dynamicOperatorClient.UpdateStaticPodOperatorSpec", trace.WithAttributes())
+	defer span.End()
+
+	uncastOriginal, err := c.informer.Lister().Get(ctx, "cluster")
 	if err != nil {
 		return nil, "", err
 	}
@@ -79,7 +90,7 @@ func (c dynamicOperatorClient) UpdateStaticPodOperatorSpec(ctx context.Context, 
 	if err != nil {
 		return nil, "", err
 	}
-	retSpec, err := getStaticPodOperatorSpecFromUnstructured(ret.UnstructuredContent())
+	retSpec, err := getStaticPodOperatorSpecFromUnstructured(ctx, ret.UnstructuredContent())
 	if err != nil {
 		return nil, "", err
 	}
@@ -88,7 +99,11 @@ func (c dynamicOperatorClient) UpdateStaticPodOperatorSpec(ctx context.Context, 
 }
 
 func (c dynamicOperatorClient) UpdateStaticPodOperatorStatus(ctx context.Context, resourceVersion string, status *operatorv1.StaticPodOperatorStatus) (*operatorv1.StaticPodOperatorStatus, error) {
-	uncastOriginal, err := c.informer.Lister().Get("cluster")
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "dynamicOperatorClient.UpdateStaticPodOperatorStatus", trace.WithAttributes())
+	defer span.End()
+
+	uncastOriginal, err := c.informer.Lister().Get(ctx, "cluster")
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +119,7 @@ func (c dynamicOperatorClient) UpdateStaticPodOperatorStatus(ctx context.Context
 	if err != nil {
 		return nil, err
 	}
-	retStatus, err := getStaticPodOperatorStatusFromUnstructured(ret.UnstructuredContent())
+	retStatus, err := getStaticPodOperatorStatusFromUnstructured(ctx, ret.UnstructuredContent())
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +139,11 @@ func (c dynamicOperatorClient) PatchStaticOperatorStatus(ctx context.Context, js
 	return c.patchOperatorStatus(ctx, jsonPatch)
 }
 
-func getStaticPodOperatorSpecFromUnstructured(obj map[string]interface{}) (*operatorv1.StaticPodOperatorSpec, error) {
+func getStaticPodOperatorSpecFromUnstructured(ctx context.Context, obj map[string]interface{}) (*operatorv1.StaticPodOperatorSpec, error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "dynamicOperatorClient.getStaticPodOperatorSpecFromUnstructured")
+	defer span.End()
+
 	uncastSpec, exists, err := unstructured.NestedMap(obj, "spec")
 	if !exists {
 		return &operatorv1.StaticPodOperatorSpec{}, nil
@@ -161,7 +180,11 @@ func setStaticPodOperatorSpecFromUnstructured(obj map[string]interface{}, spec *
 	return unstructured.SetNestedMap(obj, originalUnstructuredSpec, "spec")
 }
 
-func getStaticPodOperatorStatusFromUnstructured(obj map[string]interface{}) (*operatorv1.StaticPodOperatorStatus, error) {
+func getStaticPodOperatorStatusFromUnstructured(ctx context.Context, obj map[string]interface{}) (*operatorv1.StaticPodOperatorStatus, error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "dynamicOperatorClient.getStaticPodOperatorStatusFromUnstructured")
+	defer span.End()
+
 	uncastStatus, exists, err := unstructured.NestedMap(obj, "status")
 	if !exists {
 		return &operatorv1.StaticPodOperatorStatus{}, nil

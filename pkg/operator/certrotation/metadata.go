@@ -1,11 +1,23 @@
 package certrotation
 
 import (
+	"context"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func ensureOwnerRefAndTLSAnnotations(secret *corev1.Secret, owner *metav1.OwnerReference, additionalAnnotations AdditionalAnnotations) bool {
+func ensureOwnerRefAndTLSAnnotations(ctx context.Context, secret *corev1.Secret, owner *metav1.OwnerReference, additionalAnnotations AdditionalAnnotations) bool {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "ensureOwnerRefAndTLSAnnotations", trace.WithAttributes(
+		attribute.String("namespace", secret.Namespace),
+		attribute.String("name", secret.Name),
+	))
+	defer span.End()
+
 	needsMetadataUpdate := false
 	// no ownerReference set
 	if owner != nil {
@@ -15,7 +27,14 @@ func ensureOwnerRefAndTLSAnnotations(secret *corev1.Secret, owner *metav1.OwnerR
 	return additionalAnnotations.EnsureTLSMetadataUpdate(&secret.ObjectMeta) || needsMetadataUpdate
 }
 
-func ensureSecretTLSTypeSet(secret *corev1.Secret) bool {
+func ensureSecretTLSTypeSet(ctx context.Context, secret *corev1.Secret) bool {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "ensureSecretTLSTypeSet", trace.WithAttributes(
+		attribute.String("namespace", secret.Namespace),
+		attribute.String("name", secret.Name),
+	))
+	defer span.End()
+
 	// Existing secret not found - no need to update metadata (will be done by needNewSigningCertKeyPair / NeedNewTargetCertKeyPair)
 	if len(secret.ResourceVersion) == 0 {
 		return false

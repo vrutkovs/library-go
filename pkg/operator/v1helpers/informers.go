@@ -1,6 +1,7 @@
 package v1helpers
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"time"
@@ -80,13 +81,13 @@ func (i kubeInformersForNamespaces) ConfigMapLister() corev1listers.ConfigMapLis
 	return configMapLister(i)
 }
 
-func (l configMapLister) List(selector labels.Selector) (ret []*corev1.ConfigMap, err error) {
+func (l configMapLister) List(ctx context.Context, selector labels.Selector) (ret []*corev1.ConfigMap, err error) {
 	globalInformer, ok := l[""]
 	if !ok {
 		return nil, fmt.Errorf("combinedLister does not support cross namespace list")
 	}
 
-	return globalInformer.Core().V1().ConfigMaps().Lister().List(selector)
+	return globalInformer.Core().V1().ConfigMaps().Lister().List(ctx, selector)
 }
 
 func (l configMapLister) ConfigMaps(namespace string) corev1listers.ConfigMapNamespaceLister {
@@ -105,13 +106,13 @@ func (i kubeInformersForNamespaces) SecretLister() corev1listers.SecretLister {
 	return secretLister(i)
 }
 
-func (l secretLister) List(selector labels.Selector) (ret []*corev1.Secret, err error) {
+func (l secretLister) List(ctx context.Context, selector labels.Selector) (ret []*corev1.Secret, err error) {
 	globalInformer, ok := l[""]
 	if !ok {
 		return nil, fmt.Errorf("combinedLister does not support cross namespace list")
 	}
 
-	return globalInformer.Core().V1().Secrets().Lister().List(selector)
+	return globalInformer.Core().V1().Secrets().Lister().List(ctx, selector)
 }
 
 func (l secretLister) Secrets(namespace string) corev1listers.SecretNamespaceLister {
@@ -130,13 +131,13 @@ func (i kubeInformersForNamespaces) PodLister() corev1listers.PodLister {
 	return podLister(i)
 }
 
-func (l podLister) List(selector labels.Selector) (ret []*corev1.Pod, err error) {
+func (l podLister) List(ctx context.Context, selector labels.Selector) (ret []*corev1.Pod, err error) {
 	globalInformer, ok := l[""]
 	if !ok {
 		return nil, fmt.Errorf("combinedLister does not support cross namespace list")
 	}
 
-	return globalInformer.Core().V1().Pods().Lister().List(selector)
+	return globalInformer.Core().V1().Pods().Lister().List(ctx, selector)
 }
 
 func (l podLister) Pods(namespace string) corev1listers.PodNamespaceLister {

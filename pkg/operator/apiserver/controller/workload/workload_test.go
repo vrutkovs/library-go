@@ -718,7 +718,7 @@ func TestUpdateOperatorStatus(t *testing.T) {
 			}
 
 			// validate
-			_, actualOperatorStatus, _, err := fakeOperatorClient.GetOperatorState()
+			_, actualOperatorStatus, _, err := fakeOperatorClient.GetOperatorState(t.Context())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -738,15 +738,15 @@ type fakePodNamespaceLister struct {
 	lister *fakePodLister
 }
 
-func (f *fakePodNamespaceLister) List(selector labels.Selector) (ret []*corev1.Pod, err error) {
+func (f *fakePodNamespaceLister) List(ctx context.Context, selector labels.Selector) (ret []*corev1.Pod, err error) {
 	return f.lister.pods, nil
 }
 
-func (f *fakePodNamespaceLister) Get(name string) (*corev1.Pod, error) {
+func (f *fakePodNamespaceLister) Get(ctx context.Context, name string) (*corev1.Pod, error) {
 	panic("implement me")
 }
 
-func (f *fakePodLister) List(selector labels.Selector) (ret []*corev1.Pod, err error) {
+func (f *fakePodLister) List(ctx context.Context, selector labels.Selector) (ret []*corev1.Pod, err error) {
 	return f.pods, nil
 }
 

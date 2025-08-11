@@ -17,17 +17,17 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events"
 )
 
-func preconditionsForEnabledAPIServices(endpointsListerForTargetNs corev1listers.EndpointsLister, configmapListerForKubeSystemNs corev1listers.ConfigMapLister) func(apiServices []*apiregistrationv1.APIService) (bool, error) {
+func preconditionsForEnabledAPIServices(ctx context.Context, endpointsListerForTargetNs corev1listers.EndpointsLister, configmapListerForKubeSystemNs corev1listers.ConfigMapLister) func(apiServices []*apiregistrationv1.APIService) (bool, error) {
 	return func(apiServices []*apiregistrationv1.APIService) (bool, error) {
-		areEndpointsPresent, err := checkEndpointsPresence(endpointsListerForTargetNs, apiServices)
+		areEndpointsPresent, err := checkEndpointsPresence(ctx, endpointsListerForTargetNs, apiServices)
 		if !areEndpointsPresent || err != nil {
 			return false, err
 		}
-		return bootstrap.IsBootstrapComplete(configmapListerForKubeSystemNs)
+		return bootstrap.IsBootstrapComplete(ctx, configmapListerForKubeSystemNs)
 	}
 }
 
-func checkEndpointsPresence(endpointsLister corev1listers.EndpointsLister, apiServices []*apiregistrationv1.APIService) (bool, error) {
+func checkEndpointsPresence(ctx context.Context, endpointsLister corev1listers.EndpointsLister, apiServices []*apiregistrationv1.APIService) (bool, error) {
 	type coordinate struct {
 		namespace string
 		name      string
@@ -49,7 +49,7 @@ func checkEndpointsPresence(endpointsLister corev1listers.EndpointsLister, apiSe
 	}
 
 	for _, curr := range coordinates {
-		endpoints, err := endpointsLister.Endpoints(curr.namespace).Get(curr.name)
+		endpoints, err := endpointsLister.Endpoints(curr.namespace).Get(ctx, curr.name)
 		if err != nil {
 			return false, err
 		}

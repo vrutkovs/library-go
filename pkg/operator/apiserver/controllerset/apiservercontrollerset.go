@@ -3,9 +3,10 @@ package apiservercontrollerset
 import (
 	"context"
 	"fmt"
-	"k8s.io/utils/clock"
 	"regexp"
 	"time"
+
+	"k8s.io/utils/clock"
 
 	configv1 "github.com/openshift/api/config/v1"
 	configv1client "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1"
@@ -39,6 +40,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	corev1listers "k8s.io/client-go/listers/core/v1"
 	apiregistrationv1client "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
 	apiregistrationinformers "k8s.io/kube-aggregator/pkg/client/informers/externalversions"
 )
@@ -178,6 +180,7 @@ func (cs *APIServerControllerSet) WithoutClusterOperatorStatusController() *APIS
 }
 
 func (cs *APIServerControllerSet) WithAPIServiceController(
+	ctx context.Context,
 	controllerName, targetNamespace string,
 	getAPIServicesToManageFn apiservice.GetAPIServicesToMangeFunc,
 	apiregistrationInformers apiregistrationinformers.SharedInformerFactory,
@@ -187,6 +190,7 @@ func (cs *APIServerControllerSet) WithAPIServiceController(
 	informers ...factory.Informer,
 ) *APIServerControllerSet {
 	cs.apiServiceController.controller = apiservice.NewAPIServiceController(
+		ctx,
 		controllerName,
 		targetNamespace,
 		getAPIServicesToManageFn,
@@ -405,7 +409,8 @@ func (cs *APIServerControllerSet) WithAuditPolicyController(
 	targetNamespace string,
 	targetConfigMapName string,
 	configInformers configinformers.SharedInformerFactory,
-	kubeInformersForTargetNamesace kubeinformers.SharedInformerFactory,
+	configMapLister corev1listers.ConfigMapNamespaceLister,
+	kubeInformersForTargetNamespace kubeinformers.SharedInformerFactory,
 	kubeClient kubernetes.Interface,
 ) *APIServerControllerSet {
 	cs.auditPolicyController.controller = auditpolicy.NewAuditPolicyController(
@@ -415,7 +420,8 @@ func (cs *APIServerControllerSet) WithAuditPolicyController(
 		cs.operatorClient,
 		kubeClient,
 		configInformers,
-		kubeInformersForTargetNamesace,
+		kubeInformersForTargetNamespace,
+		configMapLister,
 		cs.eventRecorder,
 	)
 	return cs

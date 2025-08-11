@@ -1,6 +1,7 @@
 package node
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -50,8 +51,8 @@ func NewSuppressConfigUpdateUntilSameProfileFunc(
 	return ret.shouldSuppressConfigUpdates
 }
 
-func (s *revisionDiffProfileSuppressor) shouldSuppressConfigUpdates() (suppress bool, reason string, err error) {
-	operatorSpec, operatorStatus, _, err := s.operatorClient.GetStaticPodOperatorState()
+func (s *revisionDiffProfileSuppressor) shouldSuppressConfigUpdates(ctx context.Context) (suppress bool, reason string, err error) {
+	operatorSpec, operatorStatus, _, err := s.operatorClient.GetStaticPodOperatorState(ctx)
 	if err != nil {
 		return false, "", err
 	}
@@ -90,7 +91,7 @@ func (s *revisionDiffProfileSuppressor) shouldSuppressConfigUpdates() (suppress 
 
 	for revision := range uniqueRevisionMap {
 		configMapNameWithRevision := fmt.Sprintf("%s-%d", revisionConfigMapName, revision)
-		configMap, err := s.configMapLister.Get(configMapNameWithRevision)
+		configMap, err := s.configMapLister.Get(ctx, configMapNameWithRevision)
 		if err != nil {
 			return false, "", err
 		}
@@ -153,8 +154,8 @@ func NewSuppressConfigUpdateForExtremeProfilesFunc(
 	return ret.shouldSuppressConfigUpdates, nil
 }
 
-func (s *rejectExtremeProfilesSupressor) shouldSuppressConfigUpdates() (suppress bool, reason string, err error) {
-	operatorSpec, operatorStatus, _, err := s.operatorClient.GetStaticPodOperatorState()
+func (s *rejectExtremeProfilesSupressor) shouldSuppressConfigUpdates(ctx context.Context) (suppress bool, reason string, err error) {
+	operatorSpec, operatorStatus, _, err := s.operatorClient.GetStaticPodOperatorState(ctx)
 	if err != nil {
 		return false, "", err
 	}
@@ -178,7 +179,7 @@ func (s *rejectExtremeProfilesSupressor) shouldSuppressConfigUpdates() (suppress
 	observedConfigPruned := configobserver.Pruned(observedConfig, s.usedConfigPaths...)
 
 	// get desired profile from config node object
-	configNode, err := s.configNodeLister.Get("cluster")
+	configNode, err := s.configNodeLister.Get(ctx, "cluster")
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
 			return false, "", err

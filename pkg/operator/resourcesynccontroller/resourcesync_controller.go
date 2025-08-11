@@ -4,12 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	applyoperatorv1 "github.com/openshift/client-go/operator/applyconfigurations/operator/v1"
 	"net/http"
 	"sort"
 	"strings"
 	"sync"
 	"time"
+
+	applyoperatorv1 "github.com/openshift/client-go/operator/applyconfigurations/operator/v1"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -90,7 +94,7 @@ func NewResourceSyncController(
 	f := factory.New().
 		WithSync(c.Sync).
 		WithSyncContext(c.syncCtx).
-		WithInformers(informers...).
+		WithInformersQueueKeyFunc(v1helpers.ObjToString, informers...).
 		ResyncEvery(time.Minute).
 		ToController(
 			instanceName, // don't change what is passed here unless you also remove the old FooDegraded condition
@@ -188,12 +192,18 @@ func errorWithProvider(provider string, err error) error {
 }
 
 func (c *ResourceSyncController) Sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	operatorSpec, _, _, err := c.operatorConfigClient.GetOperatorState()
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "ckao.ResourceSyncController", trace.WithAttributes(
+		attribute.String("aaaQueueKey", syncCtx.QueueKey()),
+	))
+	defer span.End()
+
+	operatorSpec, _, _, err := c.operatorConfigClient.GetOperatorState(ctx)
 	if err != nil {
 		return err
 	}
 
-	if !management.IsOperatorManaged(operatorSpec.ManagementState) {
+	if !management.IsOperatorManaged(ctx, operatorSpec.ManagementState) {
 		return nil
 	}
 
@@ -204,7 +214,7 @@ func (c *ResourceSyncController) Sync(ctx context.Context, syncCtx factory.SyncC
 
 	for destination, source := range c.configMapSyncRules {
 		// skip the sync if the preconditions aren't fulfilled
-		if fulfilled, err := source.preconditionsFulfilledFn(); !fulfilled || err != nil {
+		if fulfilled, err := source.preconditionsFulfilledFn(ctx); !fulfilled || err != nil {
 			if err != nil {
 				errors = append(errors, err)
 			}
@@ -232,7 +242,7 @@ func (c *ResourceSyncController) Sync(ctx context.Context, syncCtx factory.SyncC
 	}
 	for destination, source := range c.secretSyncRules {
 		// skip the sync if the preconditions aren't fulfilled
-		if fulfilled, err := source.preconditionsFulfilledFn(); !fulfilled || err != nil {
+		if fulfilled, err := source.preconditionsFulfilledFn(ctx); !fulfilled || err != nil {
 			if err != nil {
 				errors = append(errors, err)
 			}

@@ -71,7 +71,7 @@ func NewSecretRevisionPruneController(
 func (c *SecretRevisionPruneController) sync(ctx context.Context, syncContext factory.SyncContext) error {
 	klog.V(5).Infof("revision pruner sync for ns/%s", c.targetNamespace)
 
-	pods, err := c.podInformer.Lister().Pods(c.targetNamespace).List(c.podSelector)
+	pods, err := c.podInformer.Lister().Pods(c.targetNamespace).List(ctx, c.podSelector)
 	if err != nil {
 		return err
 	}
@@ -81,7 +81,7 @@ func (c *SecretRevisionPruneController) sync(ctx context.Context, syncContext fa
 		return nil
 	}
 
-	secrets, err := c.secretInformer.Lister().Secrets(c.targetNamespace).List(labels.Everything())
+	secrets, err := c.secretInformer.Lister().Secrets(c.targetNamespace).List(ctx, labels.Everything())
 	if err != nil {
 		return err
 	}

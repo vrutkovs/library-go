@@ -1,6 +1,7 @@
 package resourcesynccontroller
 
 import (
+	"context"
 	"crypto/x509"
 	"fmt"
 	"reflect"
@@ -14,10 +15,10 @@ import (
 	"github.com/openshift/library-go/pkg/operator/certrotation"
 )
 
-func CombineCABundleConfigMaps(destinationConfigMap ResourceLocation, lister corev1listers.ConfigMapLister, additionalAnnotations certrotation.AdditionalAnnotations, inputConfigMaps ...ResourceLocation) (*corev1.ConfigMap, error) {
+func CombineCABundleConfigMaps(ctx context.Context, destinationConfigMap ResourceLocation, lister corev1listers.ConfigMapLister, additionalAnnotations certrotation.AdditionalAnnotations, inputConfigMaps ...ResourceLocation) (*corev1.ConfigMap, error) {
 	certificates := []*x509.Certificate{}
 	for _, input := range inputConfigMaps {
-		inputConfigMap, err := lister.ConfigMaps(input.Namespace).Get(input.Name)
+		inputConfigMap, err := lister.ConfigMaps(input.Namespace).Get(ctx, input.Name)
 		if apierrors.IsNotFound(err) {
 			continue
 		}
@@ -71,7 +72,7 @@ func CombineCABundleConfigMaps(destinationConfigMap ResourceLocation, lister cor
 	return cm, nil
 }
 
-func CombineCABundleConfigMapsOptimistically(destinationConfigMap *corev1.ConfigMap, lister corev1listers.ConfigMapLister, additionalAnnotations certrotation.AdditionalAnnotations, inputConfigMaps ...ResourceLocation) (*corev1.ConfigMap, bool, error) {
+func CombineCABundleConfigMapsOptimistically(ctx context.Context, destinationConfigMap *corev1.ConfigMap, lister corev1listers.ConfigMapLister, additionalAnnotations certrotation.AdditionalAnnotations, inputConfigMaps ...ResourceLocation) (*corev1.ConfigMap, bool, error) {
 	var cm *corev1.ConfigMap
 	if destinationConfigMap == nil {
 		cm = &corev1.ConfigMap{}
@@ -80,7 +81,7 @@ func CombineCABundleConfigMapsOptimistically(destinationConfigMap *corev1.Config
 	}
 	certificates := []*x509.Certificate{}
 	for _, input := range inputConfigMaps {
-		inputConfigMap, err := lister.ConfigMaps(input.Namespace).Get(input.Name)
+		inputConfigMap, err := lister.ConfigMaps(input.Namespace).Get(ctx, input.Name)
 		if apierrors.IsNotFound(err) {
 			continue
 		}

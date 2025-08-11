@@ -65,7 +65,7 @@ func runFuzzer(t *testing.T) {
 	quotaFactory := quotainformer.NewSharedInformerFactory(quotaClient, 0)
 
 	controller := NewClusterQuotaMappingController(kubeInformerFactory.Core().V1().Namespaces(), quotaFactory.Quota().V1().ClusterResourceQuotas())
-	go controller.Run(5, stopCh)
+	go controller.Run(t.Context(), 5, stopCh)
 	quotaFactory.Start(stopCh)
 	kubeInformerFactory.Start(stopCh)
 

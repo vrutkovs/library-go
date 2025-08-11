@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -21,8 +22,8 @@ import (
 // It is important to note that the bootstrap node might not be removed until additional conditions are met.
 // For example, on a SNO cluster, the installer waits until the CEO removes the bootstrap member from the etcd cluster.
 // In HA clusters, the bootstrap node is torn down as soon as the configmap is created with the appropriate content.
-func IsBootstrapComplete(configMapClient corev1listers.ConfigMapLister) (bool, error) {
-	bootstrapFinishedConfigMap, err := configMapClient.ConfigMaps("kube-system").Get("bootstrap")
+func IsBootstrapComplete(ctx context.Context, configMapClient corev1listers.ConfigMapLister) (bool, error) {
+	bootstrapFinishedConfigMap, err := configMapClient.ConfigMaps("kube-system").Get(ctx, "bootstrap")
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// If the resource was deleted (e.g. by an admin) after bootstrap is actually complete,

@@ -2,12 +2,13 @@ package resourcesynccontroller
 
 import (
 	"context"
-	clocktesting "k8s.io/utils/clock/testing"
 	"net/http"
 	"net/http/httptest"
 	"sync"
 	"testing"
 	"time"
+
+	clocktesting "k8s.io/utils/clock/testing"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -329,9 +330,9 @@ func TestSyncConditionally(t *testing.T) {
 	}
 }
 
-func conditionFulfilled() (bool, error) { return true, nil }
+func conditionFulfilled(ctx context.Context) (bool, error) { return true, nil }
 
-func conditionNotFulfilled() (bool, error) { return false, nil }
+func conditionNotFulfilled(ctx context.Context) (bool, error) { return false, nil }
 
 func TestServeHTTP(t *testing.T) {
 	c := &ResourceSyncController{

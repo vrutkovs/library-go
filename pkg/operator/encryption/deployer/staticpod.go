@@ -1,6 +1,8 @@
 package deployer
 
 import (
+	"context"
+
 	"k8s.io/client-go/tools/cache"
 
 	operatorv1helpers "github.com/openshift/library-go/pkg/operator/v1helpers"
@@ -15,8 +17,8 @@ var (
 	_ MasterNodeProvider = &StaticPodNodeProvider{}
 )
 
-func (p StaticPodNodeProvider) MasterNodeNames() ([]string, error) {
-	_, status, _, err := p.OperatorClient.GetStaticPodOperatorState()
+func (p StaticPodNodeProvider) MasterNodeNames(ctx context.Context) ([]string, error) {
+	_, status, _, err := p.OperatorClient.GetStaticPodOperatorState(ctx)
 	if err != nil {
 		return nil, err
 	}

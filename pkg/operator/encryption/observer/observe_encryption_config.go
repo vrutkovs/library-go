@@ -1,6 +1,8 @@
 package observer
 
 import (
+	"context"
+
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -22,7 +24,7 @@ type SecretsListers interface {
 // the flag is not removed when the encryption-config was accidentally removed
 // there is an active reconciliation loop in place that will eventually synchronize the missing resource
 func NewEncryptionConfigObserver(targetNamespace string, encryptionConfFilePath string) configobserver.ObserveConfigFunc {
-	return func(genericListers configobserver.Listers, recorder events.Recorder, existingConfig map[string]interface{}) (map[string]interface{}, []error) {
+	return func(ctx context.Context, genericListers configobserver.Listers, recorder events.Recorder, existingConfig map[string]interface{}) (map[string]interface{}, []error) {
 		encryptionConfigPath := []string{"apiServerArguments", "encryption-provider-config"}
 		listers := genericListers.(SecretsListers)
 		var errs []error
@@ -42,7 +44,7 @@ func NewEncryptionConfigObserver(targetNamespace string, encryptionConfFilePath 
 		previousEncryptionConfigFound := len(existingEncryptionConfig) > 0
 		observedConfig := map[string]interface{}{}
 
-		encryptionConfigSecret, err := listers.SecretLister().Secrets(targetNamespace).Get(encryptionconfig.EncryptionConfSecretName)
+		encryptionConfigSecret, err := listers.SecretLister().Secrets(targetNamespace).Get(ctx, encryptionconfig.EncryptionConfSecretName)
 		if errors.IsNotFound(err) {
 			// warn only if the encryption-provider-config flag was set before
 			if previousEncryptionConfigFound {

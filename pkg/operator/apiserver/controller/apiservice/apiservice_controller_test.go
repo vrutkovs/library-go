@@ -3,8 +3,9 @@ package apiservice
 import (
 	"context"
 	"fmt"
-	clocktesting "k8s.io/utils/clock/testing"
 	"time"
+
+	clocktesting "k8s.io/utils/clock/testing"
 
 	"sort"
 	"strings"
@@ -232,7 +233,7 @@ func TestAvailableStatus(t *testing.T) {
 
 			_ = operator.sync(context.TODO(), factory.NewSyncContext("test", eventRecorder))
 
-			_, resultStatus, _, err := fakeOperatorClient.GetOperatorState()
+			_, resultStatus, _, err := fakeOperatorClient.GetOperatorState(t.Context())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -344,7 +345,7 @@ func TestDisabledAPIService(t *testing.T) {
 		t.Fatalf("At least one of ['apps.openshift.io', 'build.openshift.io'] APIServices is missing")
 	}
 
-	_, resultStatus, _, err := fakeOperatorClient.GetOperatorState()
+	_, resultStatus, _, err := fakeOperatorClient.GetOperatorState(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -394,7 +395,7 @@ func TestDisabledAPIService(t *testing.T) {
 		t.Fatalf("Found unexpected 'build.openshift.io' APIService")
 	}
 
-	_, resultStatus, _, err = fakeOperatorClient.GetOperatorState()
+	_, resultStatus, _, err = fakeOperatorClient.GetOperatorState(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -434,7 +435,7 @@ func TestDisabledAPIService(t *testing.T) {
 		services.Insert(item.Spec.Group)
 	}
 
-	_, resultStatus, _, err = fakeOperatorClient.GetOperatorState()
+	_, resultStatus, _, err = fakeOperatorClient.GetOperatorState(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -525,7 +526,7 @@ func TestPreconditionsForEnabledAPIServices(t *testing.T) {
 			}
 			endpointLister := corev1listers.NewEndpointsLister(endpointIndexer)
 
-			target := preconditionsForEnabledAPIServices(endpointLister, configMapLister)
+			target := preconditionsForEnabledAPIServices(t.Context(), endpointLister, configMapLister)
 
 			actualStatus, actualError := target(scenario.existingAPIServices)
 			if actualStatus != scenario.expectedStatus {

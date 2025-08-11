@@ -8,6 +8,9 @@ import (
 	"strings"
 	"time"
 
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
@@ -78,7 +81,7 @@ func New(
 
 	return factory.New().
 		ResyncEvery(time.Minute).
-		WithInformers(
+		WithInformersQueueKeyFunc(v1helpers.ObjToString,
 			operatorClient.Informer(),
 			kubeInformersForTargetNamespace.Core().V1().Pods().Informer(),
 			infraInformer.Informer(),
@@ -95,7 +98,13 @@ func New(
 }
 
 func (c *missingStaticPodController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	installerPods, err := c.podListerForTargetNamespace.List(labels.SelectorFromSet(labels.Set{"app": "installer"}))
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "ckao.InstallerStateController", trace.WithAttributes(
+		attribute.String("aaaQueueKey", syncCtx.QueueKey()),
+	))
+	defer span.End()
+
+	installerPods, err := c.podListerForTargetNamespace.List(ctx, labels.SelectorFromSet(labels.Set{"app": "installer"}))
 	if err != nil {
 		return err
 	}
@@ -120,7 +129,7 @@ func (c *missingStaticPodController) sync(ctx context.Context, syncCtx factory.S
 			continue
 		}
 
-		gracePeriod, err := c.getStaticPodTerminationGracePeriodSecondsForRevision(installerPodRevision)
+		gracePeriod, err := c.getStaticPodTerminationGracePeriodSecondsForRevision(ctx, installerPodRevision)
 		if err != nil {
 			return err
 		}
@@ -147,7 +156,7 @@ func (c *missingStaticPodController) sync(ctx context.Context, syncCtx factory.S
 			//     since the installer pod has completed at finishedAt
 			//
 			// now check to see if we have a mirror pod on this node
-			staticPodRevisionOnThisNode, err := c.getStaticPodCurrentRevisionForNode(node)
+			staticPodRevisionOnThisNode, err := c.getStaticPodCurrentRevisionForNode(ctx, node)
 			if err != nil && !apierrors.IsNotFound(err) {
 				// we expect every static pod to have a valid revision
 				return fmt.Errorf("failed to get a revision for the static pod %q - %w", mirrorStaticPodNameForNode(c.staticPodName, node), err)
@@ -186,8 +195,8 @@ func (c *missingStaticPodController) sync(ctx context.Context, syncCtx factory.S
 
 // getStaticPodCurrentRevisionForNode reads the current revision from the static pod for the given node
 // since the names are uniques and we know how to construct the final pod's name we always expect to get the desired pod
-func (c *missingStaticPodController) getStaticPodCurrentRevisionForNode(nodeName string) (int, error) {
-	staticPod, err := c.podListerForTargetNamespace.Get(mirrorStaticPodNameForNode(c.staticPodName, nodeName))
+func (c *missingStaticPodController) getStaticPodCurrentRevisionForNode(ctx context.Context, nodeName string) (int, error) {
+	staticPod, err := c.podListerForTargetNamespace.Get(ctx, mirrorStaticPodNameForNode(c.staticPodName, nodeName))
 	if err != nil {
 		return -1, err
 	}
@@ -202,11 +211,11 @@ func (c *missingStaticPodController) getStaticPodCurrentRevisionForNode(nodeName
 // getStaticPodTerminationGracePeriodSecondsForRevision reads the static pod manifest from a configmap
 // in the target namespace and returns the value of terminationGracePeriodSeconds.
 // In case no value was provided for the static pod it returns a default value of 30 seconds.
-func (c *missingStaticPodController) getStaticPodTerminationGracePeriodSecondsForRevision(revision int) (time.Duration, error) {
+func (c *missingStaticPodController) getStaticPodTerminationGracePeriodSecondsForRevision(ctx context.Context, revision int) (time.Duration, error) {
 	staticPodKeyName := "pod.yaml"
 	staticPodConfigMapName := fmt.Sprintf("%s-pod-%d", c.operandName, revision)
 
-	staticPodConfigMap, err := c.configMapListerForTargetNamespace.Get(staticPodConfigMapName)
+	staticPodConfigMap, err := c.configMapListerForTargetNamespace.Get(ctx, staticPodConfigMapName)
 	if err != nil {
 		return 0, err
 	}

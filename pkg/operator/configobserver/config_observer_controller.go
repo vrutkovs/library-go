@@ -10,6 +10,9 @@ import (
 	"time"
 
 	applyoperatorv1 "github.com/openshift/client-go/operator/applyconfigurations/operator/v1"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/imdario/mergo"
 	"k8s.io/klog/v2"
@@ -43,7 +46,7 @@ type Listers interface {
 // observedConfig that would cause the service being managed by the operator to crash. For example, if a required
 // configuration key cannot be observed, consider reusing the configuration key's previous value. Errors that occur
 // while attempting to generate the observedConfig should be returned in the errs slice.
-type ObserveConfigFunc func(listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error)
+type ObserveConfigFunc func(ctx context.Context, listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error)
 
 type ConfigObserver struct {
 	controllerInstanceName string
@@ -123,7 +126,7 @@ func NewNestedConfigObserver(
 		ResyncEvery(time.Minute).
 		WithSync(c.sync).
 		WithControllerInstanceName(c.controllerInstanceName).
-		WithInformers(append(informers, listersToInformer(listers)...)...).
+		WithInformersQueueKeyFunc(v1helpers.ObjToString, append(informers, listersToInformer(listers)...)...).
 		ToController(
 			"ConfigObserver", // don't change what is passed here unless you also remove the old FooDegraded condition
 			eventRecorder.WithComponentSuffix("config-observer"),
@@ -133,7 +136,13 @@ func NewNestedConfigObserver(
 // sync reacts to a change in prereqs by finding information that is required to match another value in the cluster. This
 // must be information that is logically "owned" by another component.
 func (c ConfigObserver) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	originalSpec, _, _, err := c.operatorClient.GetOperatorState()
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "ckao.ConfigObserver", trace.WithAttributes(
+		attribute.String("aaaQueueKey", syncCtx.QueueKey()),
+	))
+	defer span.End()
+
+	originalSpec, _, _, err := c.operatorClient.GetOperatorState(ctx)
 	if management.IsOperatorRemovable() && apierrors.IsNotFound(err) {
 		return nil
 	}
@@ -151,10 +160,14 @@ func (c ConfigObserver) sync(ctx context.Context, syncCtx factory.SyncContext) e
 	var errs []error
 	var observedConfigs []map[string]interface{}
 	for _, i := range rand.Perm(len(c.observers)) {
+		ctx, subSpan := tracer.Start(ctx, "configObserver.observer", trace.WithAttributes(
+			attribute.Int("observer-id", i),
+		))
 		var currErrs []error
-		observedConfig, currErrs := c.observers[i](c.listers, syncCtx.Recorder(), existingConfig)
+		observedConfig, currErrs := c.observers[i](ctx, c.listers, syncCtx.Recorder(), existingConfig)
 		observedConfigs = append(observedConfigs, observedConfig)
 		errs = append(errs, currErrs...)
+		subSpan.End()
 	}
 
 	mergedObservedConfig := map[string]interface{}{}
@@ -200,6 +213,10 @@ func (c ConfigObserver) sync(ctx context.Context, syncCtx factory.SyncContext) e
 }
 
 func (c ConfigObserver) updateObservedConfig(ctx context.Context, syncCtx factory.SyncContext, existingConfig map[string]interface{}, mergedObservedConfig map[string]interface{}) error {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "configObserver.updateObservedConfig")
+	defer span.End()
+
 	if len(c.nestedConfigPath) == 0 {
 		if !equality.Semantic.DeepEqual(existingConfig, mergedObservedConfig) {
 			syncCtx.Recorder().Eventf("ObservedConfigChanged", "Writing updated observed config: %v", diff.ObjectDiff(existingConfig, mergedObservedConfig))
@@ -277,7 +294,7 @@ func WithPrefix(observer ObserveConfigFunc, prefix ...string) ObserveConfigFunc 
 		return observer
 	}
 
-	return func(listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (map[string]interface{}, []error) {
+	return func(ctx context.Context, listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (map[string]interface{}, []error) {
 		errs := []error{}
 
 		nestedExistingConfig, _, err := unstructured.NestedMap(existingConfig, prefix...)
@@ -285,7 +302,7 @@ func WithPrefix(observer ObserveConfigFunc, prefix ...string) ObserveConfigFunc 
 			errs = append(errs, err)
 		}
 
-		orig, observerErrs := observer(listers, recorder, nestedExistingConfig)
+		orig, observerErrs := observer(ctx, listers, recorder, nestedExistingConfig)
 		errs = append(errs, observerErrs...)
 
 		if orig == nil {

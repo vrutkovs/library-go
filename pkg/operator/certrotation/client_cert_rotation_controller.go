@@ -6,12 +6,17 @@ import (
 	"time"
 
 	operatorv1 "github.com/openshift/api/operator/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/condition"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -32,6 +37,10 @@ type StaticPodConditionStatusReporter struct {
 }
 
 func (s *StaticPodConditionStatusReporter) Report(ctx context.Context, controllerName string, syncErr error) (bool, error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "StaticPodConditionStatusReporter")
+	defer span.End()
+
 	newCondition := operatorv1.OperatorCondition{
 		Type:   fmt.Sprintf(condition.CertRotationDegradedConditionTypeFmt, controllerName),
 		Status: operatorv1.ConditionFalse,
@@ -82,7 +91,22 @@ func NewCertRotationController(
 	return factory.New().
 		ResyncEvery(time.Minute).
 		WithSync(c.Sync).
-		WithInformers(
+		WithFilteredEventsInformersQueueKeyFunc(v1helpers.ObjToString,
+			func(obj interface{}) bool {
+				if cm, ok := obj.(*v1.ConfigMap); ok {
+					return cm.Namespace == caBundleConfigMap.Namespace && cm.Name == caBundleConfigMap.Name
+				}
+				if secret, ok := obj.(*v1.Secret); ok {
+					if secret.Namespace == rotatedSigningCASecret.Namespace && secret.Name == rotatedSigningCASecret.Name {
+						return true
+					}
+					if secret.Namespace == rotatedSelfSignedCertKeySecret.Namespace && secret.Name == rotatedSelfSignedCertKeySecret.Name {
+						return true
+					}
+					return false
+				}
+				return true
+			},
 			rotatedSigningCASecret.Informer.Informer(),
 			caBundleConfigMap.Informer.Informer(),
 			rotatedSelfSignedCertKeySecret.Informer.Informer(),
@@ -97,6 +121,19 @@ func NewCertRotationController(
 }
 
 func (c CertRotationController) Sync(ctx context.Context, syncCtx factory.SyncContext) error {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "ckao.CertRotationController", trace.WithAttributes(
+		attribute.String("aaaQueueKey", syncCtx.QueueKey()),
+		attribute.String("controllerName", c.Name),
+		attribute.String("cabundle.namespace", c.CABundleConfigMap.Namespace),
+		attribute.String("caBundle.Name", c.CABundleConfigMap.Name),
+		attribute.String("signer.Name", c.RotatedSigningCASecret.Name),
+		attribute.String("signer.Namespace", c.RotatedSigningCASecret.Namespace),
+		attribute.String("target.Name", c.RotatedSigningCASecret.Name),
+		attribute.String("target.Namespace", c.RotatedSigningCASecret.Namespace),
+	))
+	defer span.End()
+
 	syncErr := c.SyncWorker(ctx)
 
 	// running this function with RunOnceContextKey value context will make this "run-once" without updating status.

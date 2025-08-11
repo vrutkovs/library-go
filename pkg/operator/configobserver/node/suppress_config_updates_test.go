@@ -37,7 +37,7 @@ func createConfigMapsFromObservedConfigRevisions(t *testing.T, configMapNamespac
 }
 
 func validateSuppression(t *testing.T, shouldSuppressFn ShouldSuppressConfigUpdatesFunc, expectedSuppress bool) {
-	suppress, reason, err := shouldSuppressFn()
+	suppress, reason, err := shouldSuppressFn(t.Context())
 	require.NoError(t, err)
 
 	// validate if suppress reason is non-empty when suppress=true

@@ -17,7 +17,7 @@ type OperatorClient interface {
 	// GetObjectMeta return the operator metadata.
 	GetObjectMeta() (meta *metav1.ObjectMeta, err error)
 	// GetOperatorState returns the operator spec, status and the resource version, potentially from a lister.
-	GetOperatorState() (spec *operatorv1.OperatorSpec, status *operatorv1.OperatorStatus, resourceVersion string, err error)
+	GetOperatorState(ctx context.Context) (spec *operatorv1.OperatorSpec, status *operatorv1.OperatorStatus, resourceVersion string, err error)
 	// GetOperatorStateWithQuorum return the operator spec, status and resource version directly from a server read.
 	GetOperatorStateWithQuorum(ctx context.Context) (spec *operatorv1.OperatorSpec, status *operatorv1.OperatorStatus, resourceVersion string, err error)
 	// UpdateOperatorSpec updates the spec of the operator, assuming the given resource version.
@@ -35,7 +35,7 @@ type StaticPodOperatorClient interface {
 	OperatorClient
 	// GetStaticPodOperatorState returns the static pod operator spec, status and the resource version,
 	// potentially from a lister.
-	GetStaticPodOperatorState() (spec *operatorv1.StaticPodOperatorSpec, status *operatorv1.StaticPodOperatorStatus, resourceVersion string, err error)
+	GetStaticPodOperatorState(ctx context.Context) (spec *operatorv1.StaticPodOperatorSpec, status *operatorv1.StaticPodOperatorStatus, resourceVersion string, err error)
 	// GetStaticPodOperatorStateWithQuorum return the static pod operator spec, status and resource version
 	// directly from a server read.
 	GetStaticPodOperatorStateWithQuorum(ctx context.Context) (spec *operatorv1.StaticPodOperatorSpec, status *operatorv1.StaticPodOperatorStatus, resourceVersion string, err error)

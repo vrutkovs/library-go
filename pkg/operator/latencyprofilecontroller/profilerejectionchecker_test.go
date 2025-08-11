@@ -253,7 +253,7 @@ func TestCheckProfileRejection(t *testing.T) {
 			configMapIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
 			for revision, profile := range scenario.activeRevisionProfiles {
 				observedConfig := profileConfigs[profile]
-				configMap := createConfigMapFromObservedConfig(t, fmt.Sprintf("%s-%d", revisionConfigMapName, revision), configMapsNamespace, observedConfig)
+				configMap := createConfigMapFromObservedConfig(t, fmt.Sprintf("%s-%d", RevisionConfigMapName, revision), configMapsNamespace, observedConfig)
 				configMapIndexer.Add(&configMap)
 
 				activeRevisions = append(activeRevisions, revision)
@@ -263,7 +263,7 @@ func TestCheckProfileRejection(t *testing.T) {
 			checkProfileRejectionFn, err := NewInstallerProfileRejectionChecker(configMapLister, latencyConfigs, rejectionScenarios)
 			require.NoError(t, err)
 
-			isRejected, rejectMsg, err := checkProfileRejectionFn(scenario.clusterProfile, activeRevisions)
+			isRejected, rejectMsg, err := checkProfileRejectionFn(t.Context(), scenario.clusterProfile, activeRevisions)
 			require.NoError(t, err)
 
 			if isRejected != scenario.isRejectionExpected {

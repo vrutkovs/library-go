@@ -1,6 +1,7 @@
 package apiserver
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 
@@ -16,23 +17,23 @@ import (
 
 // ObserveTLSSecurityProfile observes APIServer.Spec.TLSSecurityProfile field and sets
 // the ServingInfo.MinTLSVersion, ServingInfo.CipherSuites fields of observed config
-func ObserveTLSSecurityProfile(genericListers configobserver.Listers, recorder events.Recorder, existingConfig map[string]interface{}) (map[string]interface{}, []error) {
-	return innerTLSSecurityProfileObservations(genericListers, recorder, existingConfig, []string{"servingInfo", "minTLSVersion"}, []string{"servingInfo", "cipherSuites"})
+func ObserveTLSSecurityProfile(ctx context.Context, genericListers configobserver.Listers, recorder events.Recorder, existingConfig map[string]interface{}) (map[string]interface{}, []error) {
+	return innerTLSSecurityProfileObservations(ctx, genericListers, recorder, existingConfig, []string{"servingInfo", "minTLSVersion"}, []string{"servingInfo", "cipherSuites"})
 }
 
 // ObserveTLSSecurityProfileWithPaths is like ObserveTLSSecurityProfile, but accepts
 // custom paths for ServingInfo.MinTLSVersion and ServingInfo.CipherSuites fields of observed config.
-func ObserveTLSSecurityProfileWithPaths(genericListers configobserver.Listers, recorder events.Recorder, existingConfig map[string]interface{}, minTLSVersionPath, cipherSuitesPath []string) (map[string]interface{}, []error) {
-	return innerTLSSecurityProfileObservations(genericListers, recorder, existingConfig, minTLSVersionPath, cipherSuitesPath)
+func ObserveTLSSecurityProfileWithPaths(ctx context.Context, genericListers configobserver.Listers, recorder events.Recorder, existingConfig map[string]interface{}, minTLSVersionPath, cipherSuitesPath []string) (map[string]interface{}, []error) {
+	return innerTLSSecurityProfileObservations(ctx, genericListers, recorder, existingConfig, minTLSVersionPath, cipherSuitesPath)
 }
 
 // ObserveTLSSecurityProfileToArguments observes APIServer.Spec.TLSSecurityProfile field and sets
 // the tls-min-version and tls-cipher-suites fileds of observedConfig.apiServerArguments
-func ObserveTLSSecurityProfileToArguments(genericListers configobserver.Listers, recorder events.Recorder, existingConfig map[string]interface{}) (map[string]interface{}, []error) {
-	return innerTLSSecurityProfileObservations(genericListers, recorder, existingConfig, []string{"apiServerArguments", "tls-min-version"}, []string{"apiServerArguments", "tls-cipher-suites"})
+func ObserveTLSSecurityProfileToArguments(ctx context.Context, genericListers configobserver.Listers, recorder events.Recorder, existingConfig map[string]interface{}) (map[string]interface{}, []error) {
+	return innerTLSSecurityProfileObservations(ctx, genericListers, recorder, existingConfig, []string{"apiServerArguments", "tls-min-version"}, []string{"apiServerArguments", "tls-cipher-suites"})
 }
 
-func innerTLSSecurityProfileObservations(genericListers configobserver.Listers, recorder events.Recorder, existingConfig map[string]interface{}, minTLSVersionPath, cipherSuitesPath []string) (ret map[string]interface{}, _ []error) {
+func innerTLSSecurityProfileObservations(ctx context.Context, genericListers configobserver.Listers, recorder events.Recorder, existingConfig map[string]interface{}, minTLSVersionPath, cipherSuitesPath []string) (ret map[string]interface{}, _ []error) {
 	defer func() {
 		ret = configobserver.Pruned(ret, minTLSVersionPath, cipherSuitesPath)
 	}()
@@ -52,7 +53,7 @@ func innerTLSSecurityProfileObservations(genericListers configobserver.Listers, 
 		// keep going on read error from existing config
 	}
 
-	apiServer, err := listers.APIServerLister().Get("cluster")
+	apiServer, err := listers.APIServerLister().Get(ctx, "cluster")
 	if errors.IsNotFound(err) {
 		klog.Warningf("apiserver.config.openshift.io/cluster: not found")
 		apiServer = &configv1.APIServer{}

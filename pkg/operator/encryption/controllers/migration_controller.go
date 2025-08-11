@@ -8,6 +8,9 @@ import (
 	"sort"
 	"time"
 
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -29,6 +32,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/encryption/statemachine"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
+	"github.com/openshift/library-go/pkg/operator/v1helpers"
 	operatorv1helpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 )
 
@@ -96,7 +100,7 @@ func NewMigrationController(
 		preconditionsFulfilledFn: preconditionsFulfilledFn,
 	}
 
-	return factory.New().ResyncEvery(time.Minute).WithSync(c.sync).WithControllerInstanceName(c.controllerInstanceName).WithInformers(
+	return factory.New().ResyncEvery(time.Minute).WithSync(c.sync).WithControllerInstanceName(c.controllerInstanceName).WithInformersQueueKeyFunc(v1helpers.ObjToString,
 		migrator,
 		operatorClient.Informer(),
 		kubeInformersForNamespaces.InformersFor("openshift-config-managed").Core().V1().Secrets().Informer(),
@@ -109,6 +113,14 @@ func NewMigrationController(
 }
 
 func (c *migrationController) sync(ctx context.Context, syncCtx factory.SyncContext) (err error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "ckao.encryption.migrationController", trace.WithAttributes(
+		attribute.String("controllerInstanceName", c.controllerInstanceName),
+		attribute.String("instanceName", c.instanceName),
+		attribute.String("aaaQueueKey", syncCtx.QueueKey()),
+	))
+	defer span.End()
+
 	// Status for these conditions is left out to make sure it's correctly set in every branch
 	degradedCondition := applyoperatorv1.OperatorCondition().
 		WithType("EncryptionMigrationControllerDegraded")
@@ -128,7 +140,7 @@ func (c *migrationController) sync(ctx context.Context, syncCtx factory.SyncCont
 		}
 	}()
 
-	if ready, err := shouldRunEncryptionController(c.operatorClient, c.preconditionsFulfilledFn, c.provider.ShouldRunEncryptionControllers); err != nil || !ready {
+	if ready, err := shouldRunEncryptionController(ctx, c.operatorClient, c.preconditionsFulfilledFn, c.provider.ShouldRunEncryptionControllers); err != nil || !ready {
 		if err != nil {
 			degradedCondition = nil
 			progressingCondition = nil
@@ -167,6 +179,10 @@ func (c *migrationController) sync(ctx context.Context, syncCtx factory.SyncCont
 
 // TODO doc
 func (c *migrationController) migrateKeysIfNeededAndRevisionStable(ctx context.Context, syncContext factory.SyncContext, encryptedGRs []schema.GroupResource) (migratingResources []schema.GroupResource, err error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "encryption.migrateKeysIfNeededAndRevisionStable")
+	defer span.End()
+
 	// no storage migration during revision changes
 	currentEncryptionConfig, desiredEncryptionState, _, isTransitionalReason, err := statemachine.GetEncryptionConfigAndState(ctx, c.deployer, c.secretClient, c.encryptionSecretSelector, encryptedGRs)
 	if err != nil {
@@ -181,7 +197,7 @@ func (c *migrationController) migrateKeysIfNeededAndRevisionStable(ctx context.C
 	if err != nil {
 		return nil, err
 	}
-	currentState, _ := encryptionconfig.ToEncryptionState(currentEncryptionConfig, encryptionSecrets)
+	currentState, _ := encryptionconfig.ToEncryptionState(ctx, currentEncryptionConfig, encryptionSecrets)
 	desiredEncryptedConfig := encryptionconfig.FromEncryptionState(desiredEncryptionState)
 
 	// no storage migration until config is stable

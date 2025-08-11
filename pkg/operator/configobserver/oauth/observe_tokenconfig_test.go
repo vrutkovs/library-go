@@ -2,9 +2,10 @@ package oauth
 
 import (
 	"fmt"
-	clocktesting "k8s.io/utils/clock/testing"
 	"testing"
 	"time"
+
+	clocktesting "k8s.io/utils/clock/testing"
 
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -139,7 +140,7 @@ func TestObserveAccessTokenMaxAgeSeconds(t *testing.T) {
 
 			lister := testLister{lister: configlistersv1.NewOAuthLister(indexer)}
 
-			got, errs := ObserveAccessTokenMaxAgeSeconds(lister, events.NewInMemoryRecorder(t.Name(), clocktesting.NewFakePassiveClock(time.Now())), tt.previouslyObservedConfig)
+			got, errs := ObserveAccessTokenMaxAgeSeconds(t.Context(), lister, events.NewInMemoryRecorder(t.Name(), clocktesting.NewFakePassiveClock(time.Now())), tt.previouslyObservedConfig)
 			if len(errs) != len(tt.errors) {
 				t.Errorf("Expected 0 errors, got %v.", len(errs))
 			}
@@ -157,7 +158,7 @@ func TestObserveAccessTokenMaxAgeSeconds(t *testing.T) {
 		},
 	}
 
-	got, errs := ObserveAccessTokenMaxAgeSeconds(invalidLister{}, events.NewInMemoryRecorder("fakeRecorder", clocktesting.NewFakePassiveClock(time.Now())), existingConfig)
+	got, errs := ObserveAccessTokenMaxAgeSeconds(t.Context(), invalidLister{}, events.NewInMemoryRecorder("fakeRecorder", clocktesting.NewFakePassiveClock(time.Now())), existingConfig)
 
 	// There must be only one error asserting the lister type.
 	if len(errs) != 1 {
@@ -337,7 +338,7 @@ func TestObserveAccessTokenInactivityTimeout(t *testing.T) {
 
 			lister := testLister{lister: configlistersv1.NewOAuthLister(indexer)}
 
-			got, errs := ObserveAccessTokenInactivityTimeout(lister, events.NewInMemoryRecorder(t.Name(), clocktesting.NewFakePassiveClock(time.Now())), tt.previouslyObservedConfig)
+			got, errs := ObserveAccessTokenInactivityTimeout(t.Context(), lister, events.NewInMemoryRecorder(t.Name(), clocktesting.NewFakePassiveClock(time.Now())), tt.previouslyObservedConfig)
 			if len(errs) != len(tt.errors) {
 				t.Errorf("Expected %d errors, got %d.", len(tt.errors), errs)
 			}
@@ -355,7 +356,7 @@ func TestObserveAccessTokenInactivityTimeout(t *testing.T) {
 		},
 	}
 
-	got, errs := ObserveAccessTokenInactivityTimeout(invalidLister{}, events.NewInMemoryRecorder("fakeRecorder", clocktesting.NewFakePassiveClock(time.Now())), existingConfig)
+	got, errs := ObserveAccessTokenInactivityTimeout(t.Context(), invalidLister{}, events.NewInMemoryRecorder("fakeRecorder", clocktesting.NewFakePassiveClock(time.Now())), existingConfig)
 
 	// There must be only one kind of error asserting the lister type.
 	if len(errs) != 1 {

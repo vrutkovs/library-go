@@ -10,7 +10,11 @@ import (
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/staticpod/startupmonitor/annotations"
+	"github.com/openshift/library-go/pkg/operator/v1helpers"
 	operatorv1helpers "github.com/openshift/library-go/pkg/operator/v1helpers"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 
 	"k8s.io/apimachinery/pkg/labels"
 	corev1listers "k8s.io/client-go/listers/core/v1"
@@ -52,7 +56,7 @@ func New(
 		WithSync(fd.sync).
 		WithControllerInstanceName(fd.controllerInstanceName).
 		ResyncEvery(6*time.Minute).
-		WithInformers(kubeInformersForNamespaces.InformersFor(targetNamespace).Core().V1().Pods().Informer()).
+		WithInformersQueueKeyFunc(v1helpers.ObjToString, kubeInformersForNamespaces.InformersFor(targetNamespace).Core().V1().Pods().Informer()).
 		ToController(
 			fd.controllerInstanceName,
 			eventRecorder,
@@ -60,7 +64,13 @@ func New(
 }
 
 // sync sets/unsets a StaticPodFallbackRevisionDegraded condition if a pod that matches the given label selector is annotated with FallbackForRevision
-func (fd *staticPodFallbackConditionController) sync(ctx context.Context, _ factory.SyncContext) (err error) {
+func (fd *staticPodFallbackConditionController) sync(ctx context.Context, syncCtx factory.SyncContext) (err error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "ckao.staticPodFallbackConditionController", trace.WithAttributes(
+		attribute.String("aaaQueueKey", syncCtx.QueueKey()),
+	))
+	defer span.End()
+
 	degradedCondition := applyoperatorv1.OperatorCondition().WithType("StaticPodFallbackRevisionDegraded")
 	status := applyoperatorv1.OperatorStatus()
 	defer func() {
@@ -81,7 +91,7 @@ func (fd *staticPodFallbackConditionController) sync(ctx context.Context, _ fact
 		return nil
 	}
 
-	kasPods, err := fd.podLister.List(fd.podLabelSelector)
+	kasPods, err := fd.podLister.List(ctx, fd.podLabelSelector)
 	if err != nil {
 		return err
 	}

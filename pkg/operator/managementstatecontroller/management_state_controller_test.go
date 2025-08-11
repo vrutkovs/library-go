@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	clocktesting "k8s.io/utils/clock/testing"
 	"testing"
 	"time"
+
+	clocktesting "k8s.io/utils/clock/testing"
 
 	operatorv1 "github.com/openshift/api/operator/v1"
 	applyoperatorv1 "github.com/openshift/client-go/operator/applyconfigurations/operator/v1"
@@ -100,7 +101,7 @@ func TestOperatorManagementStateController(t *testing.T) {
 				return
 			}
 
-			_, result, _, _ := statusClient.GetOperatorState()
+			_, result, _, _ := statusClient.GetOperatorState(t.Context())
 
 			if tc.expectedFailingStatus && result.Conditions[0].Type == "ManagementStateDegraded" && result.Conditions[0].Status == operatorv1.ConditionFalse {
 				t.Errorf("expected failing conditions")
@@ -137,12 +138,12 @@ func (c *statusClient) GetObjectMeta() (*metav1.ObjectMeta, error) {
 	panic("missing")
 }
 
-func (c *statusClient) GetOperatorState() (*operatorv1.OperatorSpec, *operatorv1.OperatorStatus, string, error) {
+func (c *statusClient) GetOperatorState(ctx context.Context) (*operatorv1.OperatorSpec, *operatorv1.OperatorStatus, string, error) {
 	return &c.spec, &c.status, "", nil
 }
 
 func (c *statusClient) GetOperatorStateWithQuorum(ctx context.Context) (*operatorv1.OperatorSpec, *operatorv1.OperatorStatus, string, error) {
-	return c.GetOperatorState()
+	return c.GetOperatorState(ctx)
 }
 
 func (c *statusClient) UpdateOperatorSpec(context.Context, string, *operatorv1.OperatorSpec) (spec *operatorv1.OperatorSpec, resourceVersion string, err error) {

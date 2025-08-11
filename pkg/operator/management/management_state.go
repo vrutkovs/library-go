@@ -1,7 +1,11 @@
 package management
 
 import (
+	"context"
+
 	v1 "github.com/openshift/api/operator/v1"
+
+	"go.opentelemetry.io/otel"
 )
 
 var (
@@ -61,7 +65,11 @@ func IsOperatorUnknownState(state v1.ManagementState) bool {
 }
 
 // IsOperatorManaged indicates whether the operator management state allows the control loop to proceed and manage the operand.
-func IsOperatorManaged(state v1.ManagementState) bool {
+func IsOperatorManaged(ctx context.Context, state v1.ManagementState) bool {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "operator.IsOperatorManaged")
+	defer span.End()
+
 	if IsOperatorAlwaysManaged() || IsOperatorNotRemovable() {
 		return true
 	}

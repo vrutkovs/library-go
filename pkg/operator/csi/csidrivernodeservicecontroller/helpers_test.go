@@ -122,7 +122,7 @@ func TestWithObservedProxyDaemonSetHook(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			fn := WithObservedProxyDaemonSetHook()
-			err := fn(&tc.initialDriver.Spec, tc.initialDaemonSet)
+			err := fn(t.Context(), &tc.initialDriver.Spec, tc.initialDaemonSet)
 			if err != nil && !tc.expectError {
 				t.Errorf("Expected no error running hook function, got: %v", err)
 

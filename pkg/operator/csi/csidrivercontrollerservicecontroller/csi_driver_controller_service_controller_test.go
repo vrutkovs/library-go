@@ -3,10 +3,11 @@ package csidrivercontrollerservicecontroller
 import (
 	"context"
 	"fmt"
-	clocktesting "k8s.io/utils/clock/testing"
 	"strings"
 	"testing"
 	"time"
+
+	clocktesting "k8s.io/utils/clock/testing"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -194,7 +195,7 @@ func makeInfra() *configv1.Infrastructure {
 	}
 }
 
-func deploymentAnnotationHook(opSpec *opv1.OperatorSpec, instance *appsv1.Deployment) error {
+func deploymentAnnotationHook(ctx context.Context, opSpec *opv1.OperatorSpec, instance *appsv1.Deployment) error {
 	if instance.Annotations == nil {
 		instance.Annotations = map[string]string{}
 	}

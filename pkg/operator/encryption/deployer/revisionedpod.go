@@ -21,7 +21,7 @@ import (
 // MasterNodeProvider provides master nodes.
 type MasterNodeProvider interface {
 	// MasterNodeNames returns a list of nodes expected to run API server pods.
-	MasterNodeNames() ([]string, error)
+	MasterNodeNames(ctx context.Context) ([]string, error)
 
 	// AddEventHandler registers handlers which are called whenever a resource
 	// changes that can influence the result of Nodes.
@@ -75,7 +75,7 @@ func NewRevisionLabelPodDeployer(
 // DeployedEncryptionConfigSecret returns the deployed encryption config and whether all
 // instances of the operand have acknowledged it.
 func (d *RevisionLabelPodDeployer) DeployedEncryptionConfigSecret(ctx context.Context) (secret *corev1.Secret, converged bool, err error) {
-	nodes, err := d.nodeProvider.MasterNodeNames()
+	nodes, err := d.nodeProvider.MasterNodeNames(ctx)
 	if err != nil {
 		return nil, false, err
 	}

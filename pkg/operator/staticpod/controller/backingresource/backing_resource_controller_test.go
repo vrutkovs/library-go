@@ -3,10 +3,11 @@ package backingresource
 import (
 	"context"
 	"fmt"
-	clocktesting "k8s.io/utils/clock/testing"
 	"strings"
 	"testing"
 	"time"
+
+	clocktesting "k8s.io/utils/clock/testing"
 
 	operatorv1 "github.com/openshift/api/operator/v1"
 	"github.com/openshift/library-go/pkg/controller/factory"
@@ -190,7 +191,7 @@ func TestBackingResourceController(t *testing.T) {
 			)
 			syncErr := c.Sync(context.TODO(), factory.NewSyncContext("BackingResourceController", eventRecorder))
 			if tc.validateStatus != nil {
-				_, status, _, _ := tc.operatorClient.GetOperatorState()
+				_, status, _, _ := tc.operatorClient.GetOperatorState(t.Context())
 				tc.validateStatus(t, status)
 			}
 			if syncErr != nil {

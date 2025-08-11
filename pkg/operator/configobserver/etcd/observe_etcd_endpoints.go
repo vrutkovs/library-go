@@ -1,6 +1,7 @@
 package etcd
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"reflect"
@@ -29,35 +30,35 @@ var (
 	StorageConfigURLsKey = "etcd-servers"
 )
 
-type fallBackObserverFn func(genericListers configobserver.Listers, recorder events.Recorder, currentConfig map[string]interface{}, storageConfigURLsPath []string) (map[string]interface{}, []error)
+type fallBackObserverFn func(ctx context.Context, genericListers configobserver.Listers, recorder events.Recorder, currentConfig map[string]interface{}, storageConfigURLsPath []string) (map[string]interface{}, []error)
 
 // ObserveStorageURLs observes the storage config URLs and sets storageConfig field in the observerConfig under OldStorageConfigURLsPath.
 // If there is a problem observing the current storage config URLs, then the previously observed storage config URLs will be re-used.
 // This function always adds a localhost endpoint to the list of etcd servers.
-func ObserveStorageURLsWithAlwaysLocal(genericListers configobserver.Listers, recorder events.Recorder, currentConfig map[string]interface{}) (map[string]interface{}, []error) {
-	return innerObserveStorageURLs(nil, true, genericListers, recorder, currentConfig, OldStorageConfigURLsPath)
+func ObserveStorageURLsWithAlwaysLocal(ctx context.Context, genericListers configobserver.Listers, recorder events.Recorder, currentConfig map[string]interface{}) (map[string]interface{}, []error) {
+	return innerObserveStorageURLs(ctx, nil, true, genericListers, recorder, currentConfig, OldStorageConfigURLsPath)
 }
 
 // ObserveStorageURLs observes the storage config URLs and sets storageConfig field in the observerConfig under StorageConfigURLsPath.
 // If there is a problem observing the current storage config URLs, then the previously observed storage config URLs will be re-used.
 // This function always adds a localhost endpoint to the list of etcd servers.
-func ObserveStorageURLsToArgumentsWithAlwaysLocal(genericListers configobserver.Listers, recorder events.Recorder, currentConfig map[string]interface{}) (map[string]interface{}, []error) {
-	return innerObserveStorageURLs(nil, true, genericListers, recorder, currentConfig, StorageConfigURLsPath)
+func ObserveStorageURLsToArgumentsWithAlwaysLocal(ctx context.Context, genericListers configobserver.Listers, recorder events.Recorder, currentConfig map[string]interface{}) (map[string]interface{}, []error) {
+	return innerObserveStorageURLs(ctx, nil, true, genericListers, recorder, currentConfig, StorageConfigURLsPath)
 }
 
 // ObserveStorageURLs observes the storage config URLs and sets storageConfig field in the observerConfig under OldStorageConfigURLsPath.
 // If there is a problem observing the current storage config URLs, then the previously observed storage config URLs will be re-used.
-func ObserveStorageURLs(genericListers configobserver.Listers, recorder events.Recorder, currentConfig map[string]interface{}) (map[string]interface{}, []error) {
-	return innerObserveStorageURLs(innerObserveStorageURLsFromOldEndPoint, false, genericListers, recorder, currentConfig, OldStorageConfigURLsPath)
+func ObserveStorageURLs(ctx context.Context, genericListers configobserver.Listers, recorder events.Recorder, currentConfig map[string]interface{}) (map[string]interface{}, []error) {
+	return innerObserveStorageURLs(ctx, innerObserveStorageURLsFromOldEndPoint, false, genericListers, recorder, currentConfig, OldStorageConfigURLsPath)
 }
 
 // ObserveStorageURLs observes the storage config URLs and sets storageConfig field in the observerConfig under StorageConfigURLsPath.
 // If there is a problem observing the current storage config URLs, then the previously observed storage config URLs will be re-used.
-func ObserveStorageURLsToArguments(genericListers configobserver.Listers, recorder events.Recorder, currentConfig map[string]interface{}) (map[string]interface{}, []error) {
-	return innerObserveStorageURLs(innerObserveStorageURLsFromOldEndPoint, false, genericListers, recorder, currentConfig, StorageConfigURLsPath)
+func ObserveStorageURLsToArguments(ctx context.Context, genericListers configobserver.Listers, recorder events.Recorder, currentConfig map[string]interface{}) (map[string]interface{}, []error) {
+	return innerObserveStorageURLs(ctx, innerObserveStorageURLsFromOldEndPoint, false, genericListers, recorder, currentConfig, StorageConfigURLsPath)
 }
 
-func innerObserveStorageURLs(fallbackObserver fallBackObserverFn, alwaysAppendLocalhost bool, genericListers configobserver.Listers, recorder events.Recorder, currentConfig map[string]interface{}, storageConfigURLsPath []string) (ret map[string]interface{}, _ []error) {
+func innerObserveStorageURLs(ctx context.Context, fallbackObserver fallBackObserverFn, alwaysAppendLocalhost bool, genericListers configobserver.Listers, recorder events.Recorder, currentConfig map[string]interface{}, storageConfigURLsPath []string) (ret map[string]interface{}, _ []error) {
 	defer func() {
 		ret = configobserver.Pruned(ret, storageConfigURLsPath)
 	}()
@@ -77,13 +78,13 @@ func innerObserveStorageURLs(fallbackObserver fallBackObserverFn, alwaysAppendLo
 	}
 
 	var etcdURLs []string
-	etcdEndpoints, err := lister.ConfigMapLister().ConfigMaps(EtcdEndpointNamespace).Get(etcdEndpointName)
+	etcdEndpoints, err := lister.ConfigMapLister().ConfigMaps(EtcdEndpointNamespace).Get(ctx, etcdEndpointName)
 	if errors.IsNotFound(err) && fallbackObserver != nil {
 		// In clusters prior to 4.5, fall back to reading the old host-etcd-2 endpoint
 		// resource, if possible. In 4.6 we can assume consumers have been updated to
 		// use the configmap, delete the fallback code, and throw an error if the
 		// configmap doesn't exist.
-		observedConfig, fallbackErrors := fallbackObserver(genericListers, recorder, currentConfig, storageConfigURLsPath)
+		observedConfig, fallbackErrors := fallbackObserver(ctx, genericListers, recorder, currentConfig, storageConfigURLsPath)
 		if len(fallbackErrors) > 0 {
 			errs = append(errs, fallbackErrors...)
 			return previouslyObservedConfig, append(errs, fmt.Errorf("configmap %s/%s not found, and fallback observer failed", EtcdEndpointNamespace, etcdEndpointName))
@@ -157,7 +158,7 @@ func innerObserveStorageURLs(fallbackObserver fallBackObserverFn, alwaysAppendLo
 }
 
 // innerObserveStorageURLsFromOldEndPoint observes the storage URL config.
-func innerObserveStorageURLsFromOldEndPoint(genericListers configobserver.Listers, recorder events.Recorder, currentConfig map[string]interface{}, storageConfigURLsPath []string) (map[string]interface{}, []error) {
+func innerObserveStorageURLsFromOldEndPoint(ctx context.Context, genericListers configobserver.Listers, recorder events.Recorder, currentConfig map[string]interface{}, storageConfigURLsPath []string) (map[string]interface{}, []error) {
 	lister := genericListers.(EndpointsLister)
 	var errs []error
 
@@ -175,7 +176,7 @@ func innerObserveStorageURLsFromOldEndPoint(genericListers configobserver.Lister
 	observedConfig := map[string]interface{}{}
 
 	var etcdURLs sort.StringSlice
-	etcdEndpoints, err := lister.EndpointsLister().Endpoints(EtcdEndpointNamespace).Get(EtcdEndpointName)
+	etcdEndpoints, err := lister.EndpointsLister().Endpoints(EtcdEndpointNamespace).Get(ctx, EtcdEndpointName)
 	if errors.IsNotFound(err) {
 		recorder.Warningf("ObserveStorageFailed", "Required endpoints/%s in the %s namespace not found.", EtcdEndpointName, EtcdEndpointNamespace)
 		errs = append(errs, fmt.Errorf("endpoints/%s in the %s namespace: not found", EtcdEndpointName, EtcdEndpointNamespace))

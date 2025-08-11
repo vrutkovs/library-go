@@ -3,12 +3,13 @@ package csidrivernodeservicecontroller
 import (
 	"context"
 	"fmt"
-	clocktesting "k8s.io/utils/clock/testing"
 	"os"
 	"sort"
 	"strings"
 	"testing"
 	"time"
+
+	clocktesting "k8s.io/utils/clock/testing"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -350,7 +351,7 @@ func addGenerationReactor(client *fakecore.Clientset) {
 	})
 }
 
-func daemonSetAnnotationHook(opSpec *opv1.OperatorSpec, instance *appsv1.DaemonSet) error {
+func daemonSetAnnotationHook(ctx context.Context, opSpec *opv1.OperatorSpec, instance *appsv1.DaemonSet) error {
 	if instance.Annotations == nil {
 		instance.Annotations = map[string]string{}
 	}
@@ -708,7 +709,7 @@ func TestSync(t *testing.T) {
 
 			// Check expectedObjects.driver.Status
 			if test.expectedObjects.driver != nil {
-				_, actualStatus, _, err := ctx.operatorClient.GetOperatorState()
+				_, actualStatus, _, err := ctx.operatorClient.GetOperatorState(t.Context())
 				if err != nil {
 					t.Errorf("Failed to get Driver: %v", err)
 				}

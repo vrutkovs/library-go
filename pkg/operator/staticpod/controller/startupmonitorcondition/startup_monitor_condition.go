@@ -9,7 +9,11 @@ import (
 	applyoperatorv1 "github.com/openshift/client-go/operator/applyconfigurations/operator/v1"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
+	"github.com/openshift/library-go/pkg/operator/v1helpers"
 	operatorv1helpers "github.com/openshift/library-go/pkg/operator/v1helpers"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -46,7 +50,7 @@ func New(
 		WithSync(fd.sync).
 		WithControllerInstanceName(fd.controllerInstanceName).
 		ResyncEvery(6*time.Minute).
-		WithInformers(
+		WithInformersQueueKeyFunc(v1helpers.ObjToString,
 			kubeInformersForNamespaces.InformersFor(targetNamespace).Core().V1().Pods().Informer(),
 			operatorClient.Informer(),
 		).
@@ -56,7 +60,13 @@ func New(
 		)
 }
 
-func (fd *startupMonitorPodConditionController) sync(ctx context.Context, _ factory.SyncContext) (err error) {
+func (fd *startupMonitorPodConditionController) sync(ctx context.Context, syncCtx factory.SyncContext) (err error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "ckao.startupMonitorPodConditionController", trace.WithAttributes(
+		attribute.String("aaaQueueKey", syncCtx.QueueKey()),
+	))
+	defer span.End()
+
 	startupPodDegraded := applyoperatorv1.OperatorCondition().WithType("StartupMonitorPodDegraded")
 	startupPodContainerExcessiveRestartsDegraded := applyoperatorv1.OperatorCondition().WithType("StartupMonitorPodContainerExcessiveRestartsDegraded")
 	status := applyoperatorv1.OperatorStatus()
@@ -80,7 +90,7 @@ func (fd *startupMonitorPodConditionController) sync(ctx context.Context, _ fact
 		return nil
 	}
 
-	_, operatorStatus, _, err := fd.operatorClient.GetStaticPodOperatorState()
+	_, operatorStatus, _, err := fd.operatorClient.GetStaticPodOperatorState(ctx)
 	if err != nil {
 		return err
 	}
@@ -101,7 +111,7 @@ func (fd *startupMonitorPodConditionController) sync(ctx context.Context, _ fact
 		return nil
 	}
 
-	monitorPod, err := fd.podLister.Get(fmt.Sprintf("%s-startup-monitor-%s", fd.targetName, currentNodeName))
+	monitorPod, err := fd.podLister.Get(ctx, fmt.Sprintf("%s-startup-monitor-%s", fd.targetName, currentNodeName))
 	if errors.IsNotFound(err) {
 		startupPodDegraded = startupPodDegraded.WithStatus(operatorv1.ConditionFalse)
 		startupPodContainerExcessiveRestartsDegraded = startupPodContainerExcessiveRestartsDegraded.WithStatus(operatorv1.ConditionFalse)

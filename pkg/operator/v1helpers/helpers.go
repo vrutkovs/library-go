@@ -21,6 +21,9 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/yaml"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -124,7 +127,7 @@ func UpdateSpec(ctx context.Context, client OperatorClient, updateFuncs ...Updat
 	updated := false
 	var operatorSpec *operatorv1.OperatorSpec
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		oldSpec, _, resourceVersion, err := client.GetOperatorState()
+		oldSpec, _, resourceVersion, err := client.GetOperatorState(ctx)
 		if err != nil {
 			return err
 		}
@@ -161,6 +164,10 @@ type UpdateStatusFunc func(status *operatorv1.OperatorStatus) error
 
 // UpdateStatus applies the update funcs to the oldStatus and tries to update via the client.
 func UpdateStatus(ctx context.Context, client OperatorClient, updateFuncs ...UpdateStatusFunc) (*operatorv1.OperatorStatus, bool, error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "operator.UpdateStatus", trace.WithAttributes())
+	defer span.End()
+
 	updated := false
 	var updatedOperatorStatus *operatorv1.OperatorStatus
 	numberOfAttempts := 0
@@ -173,8 +180,10 @@ func UpdateStatus(ctx context.Context, client OperatorClient, updateFuncs ...Upd
 		var resourceVersion string
 		var err error
 
+		span.AddEvent(fmt.Sprintf("attempt %d", numberOfAttempts))
+
 		// prefer lister if we haven't already failed.
-		_, oldStatus, resourceVersion, err = client.GetOperatorState()
+		_, oldStatus, resourceVersion, err = client.GetOperatorState(ctx)
 		if err != nil {
 			return err
 		}
@@ -186,6 +195,7 @@ func UpdateStatus(ctx context.Context, client OperatorClient, updateFuncs ...Upd
 				return err
 			}
 			klog.V(2).Infof("lister was stale at resourceVersion=%v, live get showed resourceVersion=%v", listerResourceVersion, resourceVersion)
+			span.AddEvent(fmt.Sprintf("lister was stale at resourceVersion=%v, live get showed resourceVersion=%v", listerResourceVersion, resourceVersion))
 		}
 		previousResourceVersion = resourceVersion
 
@@ -195,6 +205,7 @@ func UpdateStatus(ctx context.Context, client OperatorClient, updateFuncs ...Upd
 				return err
 			}
 		}
+		span.AddEvent("new status generated")
 
 		if equality.Semantic.DeepEqual(oldStatus, newStatus) {
 			// We return the newStatus which is a deep copy of oldStatus but with all update funcs applied.
@@ -204,6 +215,8 @@ func UpdateStatus(ctx context.Context, client OperatorClient, updateFuncs ...Upd
 		if klog.V(4).Enabled() {
 			klog.Infof("Operator status changed: %v", operatorStatusJSONPatchNoError(oldStatus, newStatus))
 		}
+
+		span.AddEvent("applying new status")
 
 		updatedOperatorStatus, err = client.UpdateOperatorStatus(ctx, resourceVersion, newStatus)
 		updated = err == nil
@@ -237,6 +250,10 @@ type UpdateStaticPodStatusFunc func(status *operatorv1.StaticPodOperatorStatus) 
 
 // UpdateStaticPodStatus applies the update funcs to the oldStatus abd tries to update via the client.
 func UpdateStaticPodStatus(ctx context.Context, client StaticPodOperatorClient, updateFuncs ...UpdateStaticPodStatusFunc) (*operatorv1.StaticPodOperatorStatus, bool, error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "UpdateStaticPodStatus")
+	defer span.End()
+
 	updated := false
 	var updatedOperatorStatus *operatorv1.StaticPodOperatorStatus
 	numberOfAttempts := 0
@@ -250,7 +267,7 @@ func UpdateStaticPodStatus(ctx context.Context, client StaticPodOperatorClient, 
 		var err error
 
 		// prefer lister if we haven't already failed.
-		_, oldStatus, resourceVersion, err = client.GetStaticPodOperatorState()
+		_, oldStatus, resourceVersion, err = client.GetStaticPodOperatorState(ctx)
 		if err != nil {
 			return err
 		}

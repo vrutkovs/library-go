@@ -6,6 +6,9 @@ import (
 	"path/filepath"
 	"reflect"
 
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -19,6 +22,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/staticpod"
 	"github.com/openshift/library-go/pkg/operator/staticpod/controller/installer"
+	"github.com/openshift/library-go/pkg/operator/v1helpers"
 )
 
 type CertSyncController struct {
@@ -49,7 +53,7 @@ func NewCertSyncController(targetDir, targetNamespace string, configmaps, secret
 	}
 
 	return factory.New().
-		WithInformers(
+		WithInformersQueueKeyFunc(v1helpers.ObjToString,
 			informers.Core().V1().ConfigMaps().Informer(),
 			informers.Core().V1().Secrets().Informer(),
 		).
@@ -69,11 +73,17 @@ func getSecretDir(targetDir, secretName string) string {
 }
 
 func (c *CertSyncController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "ckao.CertSyncController", trace.WithAttributes(
+		attribute.String("aaaQueueKey", syncCtx.QueueKey()),
+	))
+	defer span.End()
+
 	errors := []error{}
 
 	klog.Infof("Syncing configmaps: %v", c.configMaps)
 	for _, cm := range c.configMaps {
-		configMap, err := c.configMapLister.ConfigMaps(c.namespace).Get(cm.Name)
+		configMap, err := c.configMapLister.ConfigMaps(c.namespace).Get(ctx, cm.Name)
 		switch {
 		case apierrors.IsNotFound(err) && !cm.Optional:
 			errors = append(errors, err)
@@ -177,7 +187,7 @@ func (c *CertSyncController) sync(ctx context.Context, syncCtx factory.SyncConte
 
 	klog.Infof("Syncing secrets: %v", c.secrets)
 	for _, s := range c.secrets {
-		secret, err := c.secretLister.Secrets(c.namespace).Get(s.Name)
+		secret, err := c.secretLister.Secrets(c.namespace).Get(ctx, s.Name)
 		switch {
 		case apierrors.IsNotFound(err) && !s.Optional:
 			errors = append(errors, err)

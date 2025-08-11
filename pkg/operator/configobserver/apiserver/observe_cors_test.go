@@ -1,11 +1,12 @@
 package apiserver
 
 import (
-	clocktesting "k8s.io/utils/clock/testing"
 	"reflect"
 	"sort"
 	"testing"
 	"time"
+
+	clocktesting "k8s.io/utils/clock/testing"
 
 	configv1 "github.com/openshift/api/config/v1"
 	configlistersv1 "github.com/openshift/client-go/config/listers/config/v1"
@@ -74,9 +75,9 @@ func TestObserveAdditionalCORSAllowedOrigins(t *testing.T) {
 				var gotConfig map[string]interface{}
 				var errs []error
 				if useAPIServerArguments {
-					gotConfig, errs = ObserveAdditionalCORSAllowedOriginsToArguments(listers, events.NewInMemoryRecorder(t.Name(), clocktesting.NewFakePassiveClock(time.Now())), tt.existingConfig)
+					gotConfig, errs = ObserveAdditionalCORSAllowedOriginsToArguments(t.Context(), listers, events.NewInMemoryRecorder(t.Name(), clocktesting.NewFakePassiveClock(time.Now())), tt.existingConfig)
 				} else {
-					gotConfig, errs = ObserveAdditionalCORSAllowedOrigins(listers, events.NewInMemoryRecorder(t.Name(), clocktesting.NewFakePassiveClock(time.Now())), tt.existingConfig)
+					gotConfig, errs = ObserveAdditionalCORSAllowedOrigins(t.Context(), listers, events.NewInMemoryRecorder(t.Name(), clocktesting.NewFakePassiveClock(time.Now())), tt.existingConfig)
 				}
 				if len(errs) > 0 {
 					t.Errorf("expected no errors, got %v", errs)

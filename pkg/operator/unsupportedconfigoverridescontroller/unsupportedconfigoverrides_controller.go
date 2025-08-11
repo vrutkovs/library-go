@@ -7,6 +7,9 @@ import (
 	"fmt"
 	"strings"
 
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"k8s.io/apimachinery/pkg/util/sets"
 	kyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/klog/v2"
@@ -39,7 +42,7 @@ func NewUnsupportedConfigOverridesController(
 		operatorClient:         operatorClient,
 	}
 	return factory.New().
-		WithInformers(operatorClient.Informer()).
+		WithInformersQueueKeyFunc(v1helpers.ObjToString, operatorClient.Informer()).
 		WithSync(c.sync).
 		ToController(
 			c.controllerInstanceName,
@@ -48,12 +51,18 @@ func NewUnsupportedConfigOverridesController(
 }
 
 func (c *UnsupportedConfigOverridesController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	operatorSpec, _, _, err := c.operatorClient.GetOperatorState()
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "ckao.UnsupportedConfigOverridesController", trace.WithAttributes(
+		attribute.String("aaaQueueKey", syncCtx.QueueKey()),
+	))
+	defer span.End()
+
+	operatorSpec, _, _, err := c.operatorClient.GetOperatorState(ctx)
 	if err != nil {
 		return err
 	}
 
-	if !management.IsOperatorManaged(operatorSpec.ManagementState) {
+	if !management.IsOperatorManaged(ctx, operatorSpec.ManagementState) {
 		return nil
 	}
 

@@ -3,6 +3,7 @@ package latencyprofilecontroller
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	applyoperatorv1 "github.com/openshift/client-go/operator/applyconfigurations/operator/v1"
@@ -16,6 +17,11 @@ import (
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
+	corev1 "k8s.io/api/core/v1"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -30,8 +36,9 @@ const (
 	workerLatencyProfileComplete    = "WorkerLatencyProfileComplete"
 )
 
-type MatchProfileRevisionConfigsFunc func(profile configv1.WorkerLatencyProfileType, revisions []int32) (match bool, revisionsHaveSyncedMessage string, err error)
+type MatchProfileRevisionConfigsFunc func(ctx context.Context, profile configv1.WorkerLatencyProfileType, revisions []int32) (match bool, revisionsHaveSyncedMessage string, err error)
 type CheckProfileRejectionFunc func(
+	ctx context.Context,
 	desiredProfile configv1.WorkerLatencyProfileType,
 	currentRevisions []int32,
 ) (isRejected bool, rejectMsg string, err error)
@@ -75,7 +82,17 @@ func NewLatencyProfileController(
 		configNodeLister:        nodeInformer.Lister(),
 	}
 
-	return factory.New().WithInformers(
+	return factory.New().WithFilteredEventsInformersQueueKeyFunc(v1helpers.ObjToString,
+		func(obj interface{}) bool {
+			if cm, ok := obj.(*corev1.ConfigMap); ok {
+				if strings.HasPrefix(cm.Name, RevisionConfigMapName) {
+					return true
+				}
+				return false
+			}
+			return true
+		},
+
 		// this is for our general configuration input and our status output in case another actor changes it
 		operatorClient.Informer(),
 
@@ -94,9 +111,16 @@ func NewLatencyProfileController(
 }
 
 func (c *LatencyProfileController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "ckao.LatencyProfileController", trace.WithAttributes(
+		attribute.String("controllerInstanceName", c.controllerInstanceName),
+		attribute.String("targetNamespace", c.targetNamespace),
+		attribute.String("aaaQueueKey", syncCtx.QueueKey()),
+	))
+	defer span.End()
 
 	// Collect the current latency profile
-	configNodeObj, err := c.configNodeLister.Get("cluster")
+	configNodeObj, err := c.configNodeLister.Get(ctx, "cluster")
 
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
@@ -113,7 +137,7 @@ func (c *LatencyProfileController) sync(ctx context.Context, syncCtx factory.Syn
 		return err
 	}
 
-	_, operatorStatus, _, err := c.operatorClient.GetStaticPodOperatorState()
+	_, operatorStatus, _, err := c.operatorClient.GetStaticPodOperatorState(ctx)
 	if err != nil {
 		return err
 	}
@@ -132,7 +156,7 @@ func (c *LatencyProfileController) sync(ctx context.Context, syncCtx factory.Syn
 	// In case a checkProfileRejection func was used, status will be updated accordingly
 	// ("" profile is also default profile, so "" -> anotherProfile: rejection can be handled)
 	if c.checkProfileRejectionFn != nil {
-		isRejected, rejectMsg, err := c.checkProfileRejectionFn(configNodeObj.Spec.WorkerLatencyProfile, uniqueRevisions)
+		isRejected, rejectMsg, err := c.checkProfileRejectionFn(ctx, configNodeObj.Spec.WorkerLatencyProfile, uniqueRevisions)
 		if err != nil {
 			return err
 		}
@@ -171,7 +195,7 @@ func (c *LatencyProfileController) sync(ctx context.Context, syncCtx factory.Syn
 	}
 
 	// For each revision, check that the configmap for that revision have correct arg val pairs or not
-	revisionsHaveSynced, syncMsg, err := c.matchRevisionsFn(configNodeObj.Spec.WorkerLatencyProfile, uniqueRevisions)
+	revisionsHaveSynced, syncMsg, err := c.matchRevisionsFn(ctx, configNodeObj.Spec.WorkerLatencyProfile, uniqueRevisions)
 	if err != nil {
 		return err
 	}
@@ -195,6 +219,15 @@ func (c *LatencyProfileController) sync(ctx context.Context, syncCtx factory.Syn
 }
 
 func (c *LatencyProfileController) updateStatus(ctx context.Context, isProgressing, isComplete bool, reason, message string) error {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "latencyProfileController.updateStatus", trace.WithAttributes(
+		attribute.String("controllerInstanceName", c.controllerInstanceName),
+		attribute.String("targetNamespace", c.targetNamespace),
+		attribute.String("reason", reason),
+		attribute.String("message", message),
+	))
+	defer span.End()
+
 	progressingCondition := applyoperatorv1.OperatorCondition().
 		WithType(workerLatencyProfileProgressing).
 		WithStatus(operatorv1.ConditionFalse).

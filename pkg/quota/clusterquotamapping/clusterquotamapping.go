@@ -1,6 +1,7 @@
 package clusterquotamapping
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -55,16 +56,16 @@ func NewClusterQuotaMappingController(namespaceInformer corev1informers.Namespac
 }
 
 type namespaceLister interface {
-	Each(label labels.Selector, fn func(metav1.Object) bool) error
-	Get(name string) (metav1.Object, error)
+	Each(ctx context.Context, label labels.Selector, fn func(metav1.Object) bool) error
+	Get(ctx context.Context, name string) (metav1.Object, error)
 }
 
 type v1NamespaceLister struct {
 	lister corev1listers.NamespaceLister
 }
 
-func (l v1NamespaceLister) Each(label labels.Selector, fn func(metav1.Object) bool) error {
-	results, err := l.lister.List(label)
+func (l v1NamespaceLister) Each(ctx context.Context, label labels.Selector, fn func(metav1.Object) bool) error {
+	results, err := l.lister.List(ctx, label)
 	if err != nil {
 		return err
 	}
@@ -75,8 +76,8 @@ func (l v1NamespaceLister) Each(label labels.Selector, fn func(metav1.Object) bo
 	}
 	return nil
 }
-func (l v1NamespaceLister) Get(name string) (metav1.Object, error) {
-	return l.lister.Get(name)
+func (l v1NamespaceLister) Get(ctx context.Context, name string) (metav1.Object, error) {
+	return l.lister.Get(ctx, name)
 }
 
 func newClusterQuotaMappingController(namespaceInformer cache.SharedIndexInformer, quotaInformer quotainformer.ClusterResourceQuotaInformer) *ClusterQuotaMappingController {
@@ -119,7 +120,7 @@ func (c *ClusterQuotaMappingController) GetClusterQuotaMapper() ClusterQuotaMapp
 	return c.clusterQuotaMapper
 }
 
-func (c *ClusterQuotaMappingController) Run(workers int, stopCh <-chan struct{}) {
+func (c *ClusterQuotaMappingController) Run(ctx context.Context, workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.namespaceQueue.ShutDown()
 	defer c.quotaQueue.ShutDown()
@@ -134,20 +135,20 @@ func (c *ClusterQuotaMappingController) Run(workers int, stopCh <-chan struct{})
 
 	klog.V(4).Infof("Starting workers for quota mapping controller workers")
 	for i := 0; i < workers; i++ {
-		go wait.Until(c.namespaceWorker, time.Second, stopCh)
-		go wait.Until(c.quotaWorker, time.Second, stopCh)
+		go wait.UntilWithContext(ctx, c.namespaceWorker, time.Second)
+		go wait.UntilWithContext(ctx, c.quotaWorker, time.Second)
 	}
 
 	<-stopCh
 }
 
-func (c *ClusterQuotaMappingController) syncQuota(quota *quotav1.ClusterResourceQuota) error {
+func (c *ClusterQuotaMappingController) syncQuota(ctx context.Context, quota *quotav1.ClusterResourceQuota) error {
 	matcherFunc, err := GetObjectMatcher(quota.Spec.Selector)
 	if err != nil {
 		return err
 	}
 
-	if err := c.namespaceLister.Each(labels.Everything(), func(obj metav1.Object) bool {
+	if err := c.namespaceLister.Each(ctx, labels.Everything(), func(obj metav1.Object) bool {
 		// attempt to set the mapping. The quotas never collide with each other (same quota is never processed twice in parallel)
 		// so this means that the project we have is out of date, pull a more recent copy from the cache and retest
 		for {
@@ -167,7 +168,7 @@ func (c *ClusterQuotaMappingController) syncQuota(quota *quotav1.ClusterResource
 			if !quotaMatches {
 				return false
 			}
-			newer, err := c.namespaceLister.Get(obj.GetName())
+			newer, err := c.namespaceLister.Get(ctx, obj.GetName())
 			if kapierrors.IsNotFound(err) {
 				// if the namespace is gone, then the deleteNamespace path will be called, just continue
 				break
@@ -187,8 +188,8 @@ func (c *ClusterQuotaMappingController) syncQuota(quota *quotav1.ClusterResource
 	return nil
 }
 
-func (c *ClusterQuotaMappingController) syncNamespace(namespace metav1.Object) error {
-	allQuotas, err1 := c.quotaLister.List(labels.Everything())
+func (c *ClusterQuotaMappingController) syncNamespace(ctx context.Context, namespace metav1.Object) error {
+	allQuotas, err1 := c.quotaLister.List(ctx, labels.Everything())
 	if err1 != nil {
 		return err1
 	}
@@ -221,7 +222,7 @@ func (c *ClusterQuotaMappingController) syncNamespace(namespace metav1.Object) e
 				return nil
 			}
 
-			quota, err = c.quotaLister.Get(quota.Name)
+			quota, err = c.quotaLister.Get(ctx, quota.Name)
 			if kapierrors.IsNotFound(err) {
 				// if the quota is gone, then the deleteQuota path will be called, just continue
 				break
@@ -237,14 +238,14 @@ func (c *ClusterQuotaMappingController) syncNamespace(namespace metav1.Object) e
 	return nil
 }
 
-func (c *ClusterQuotaMappingController) quotaWork() bool {
+func (c *ClusterQuotaMappingController) quotaWork(ctx context.Context) bool {
 	key, quit := c.quotaQueue.Get()
 	if quit {
 		return true
 	}
 	defer c.quotaQueue.Done(key)
 
-	quota, err := c.quotaLister.Get(key.(string))
+	quota, err := c.quotaLister.Get(ctx, key.(string))
 	if err != nil {
 		if errors.IsNotFound(err) {
 			c.quotaQueue.Forget(key)
@@ -254,7 +255,7 @@ func (c *ClusterQuotaMappingController) quotaWork() bool {
 		return false
 	}
 
-	err = c.syncQuota(quota)
+	err = c.syncQuota(ctx, quota)
 	outOfRetries := c.quotaQueue.NumRequeues(key) > 5
 	switch {
 	case err != nil && outOfRetries:
@@ -271,22 +272,22 @@ func (c *ClusterQuotaMappingController) quotaWork() bool {
 	return false
 }
 
-func (c *ClusterQuotaMappingController) quotaWorker() {
+func (c *ClusterQuotaMappingController) quotaWorker(ctx context.Context) {
 	for {
-		if quit := c.quotaWork(); quit {
+		if quit := c.quotaWork(ctx); quit {
 			return
 		}
 	}
 }
 
-func (c *ClusterQuotaMappingController) namespaceWork() bool {
+func (c *ClusterQuotaMappingController) namespaceWork(ctx context.Context) bool {
 	key, quit := c.namespaceQueue.Get()
 	if quit {
 		return true
 	}
 	defer c.namespaceQueue.Done(key)
 
-	namespace, err := c.namespaceLister.Get(key.(string))
+	namespace, err := c.namespaceLister.Get(ctx, key.(string))
 	if kapierrors.IsNotFound(err) {
 		c.namespaceQueue.Forget(key)
 		return false
@@ -296,7 +297,7 @@ func (c *ClusterQuotaMappingController) namespaceWork() bool {
 		return false
 	}
 
-	err = c.syncNamespace(namespace)
+	err = c.syncNamespace(ctx, namespace)
 	outOfRetries := c.namespaceQueue.NumRequeues(key) > 5
 	switch {
 	case err != nil && outOfRetries:
@@ -313,9 +314,9 @@ func (c *ClusterQuotaMappingController) namespaceWork() bool {
 	return false
 }
 
-func (c *ClusterQuotaMappingController) namespaceWorker() {
+func (c *ClusterQuotaMappingController) namespaceWorker(ctx context.Context) {
 	for {
-		if quit := c.namespaceWork(); quit {
+		if quit := c.namespaceWork(ctx); quit {
 			return
 		}
 	}

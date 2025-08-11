@@ -28,11 +28,11 @@ import (
 )
 
 // DeploymentHookFunc is a hook function to modify the Deployment.
-type DeploymentHookFunc func(*opv1.OperatorSpec, *appsv1.Deployment) error
+type DeploymentHookFunc func(context.Context, *opv1.OperatorSpec, *appsv1.Deployment) error
 
 // ManifestHookFunc is a hook function to modify the manifest in raw format.
 // The hook must not modify the original manifest!
-type ManifestHookFunc func(*opv1.OperatorSpec, []byte) ([]byte, error)
+type ManifestHookFunc func(context.Context, *opv1.OperatorSpec, []byte) ([]byte, error)
 
 // DeploymentController is a generic controller that manages a deployment.
 //
@@ -207,7 +207,7 @@ func (c *DeploymentController) Name() string {
 }
 
 func (c *DeploymentController) sync(ctx context.Context, syncContext factory.SyncContext) error {
-	opSpec, opStatus, _, err := c.operatorClient.GetOperatorState()
+	opSpec, opStatus, _, err := c.operatorClient.GetOperatorState(ctx)
 	if apierrors.IsNotFound(err) && management.IsOperatorRemovable() {
 		return nil
 	}
@@ -241,7 +241,7 @@ func (c *DeploymentController) syncManaged(ctx context.Context, opSpec *opv1.Ope
 			return err
 		}
 	}
-	required, err := c.getDeployment(opSpec)
+	required, err := c.getDeployment(ctx, opSpec)
 	if err != nil {
 		return err
 	}
@@ -319,7 +319,7 @@ func (c *DeploymentController) syncManaged(ctx context.Context, opSpec *opv1.Ope
 
 func (c *DeploymentController) syncDeleting(ctx context.Context, opSpec *opv1.OperatorSpec, opStatus *opv1.OperatorStatus, syncContext factory.SyncContext) error {
 	klog.V(4).Infof("syncDeleting")
-	required, err := c.getDeployment(opSpec)
+	required, err := c.getDeployment(ctx, opSpec)
 	if err != nil {
 		return err
 	}
@@ -335,11 +335,11 @@ func (c *DeploymentController) syncDeleting(ctx context.Context, opSpec *opv1.Op
 	return v1helpers.RemoveFinalizer(ctx, c.operatorClient, c.instanceName)
 }
 
-func (c *DeploymentController) getDeployment(opSpec *opv1.OperatorSpec) (*appsv1.Deployment, error) {
+func (c *DeploymentController) getDeployment(ctx context.Context, opSpec *opv1.OperatorSpec) (*appsv1.Deployment, error) {
 	manifest := c.manifest
 	for i := range c.optionalManifestHooks {
 		var err error
-		manifest, err = c.optionalManifestHooks[i](opSpec, manifest)
+		manifest, err = c.optionalManifestHooks[i](ctx, opSpec, manifest)
 		if err != nil {
 			return nil, fmt.Errorf("error running hook function (index=%d): %w", i, err)
 		}
@@ -348,7 +348,7 @@ func (c *DeploymentController) getDeployment(opSpec *opv1.OperatorSpec) (*appsv1
 	required := resourceread.ReadDeploymentV1OrDie(manifest)
 
 	for i := range c.optionalDeploymentHooks {
-		err := c.optionalDeploymentHooks[i](opSpec, required)
+		err := c.optionalDeploymentHooks[i](ctx, opSpec, required)
 		if err != nil {
 			return nil, fmt.Errorf("error running hook function (index=%d): %w", i, err)
 		}

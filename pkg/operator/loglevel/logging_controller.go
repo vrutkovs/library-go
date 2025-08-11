@@ -7,7 +7,11 @@ import (
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/management"
+	"github.com/openshift/library-go/pkg/operator/v1helpers"
 	operatorv1helpers "github.com/openshift/library-go/pkg/operator/v1helpers"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"k8s.io/apimachinery/pkg/api/errors"
 )
 
@@ -38,7 +42,7 @@ func NewClusterOperatorLoggingControllerWithLogLevel(operatorClient operatorv1he
 		defaultLogLevel: defaultLogLevel,
 	}
 	return factory.New().
-		WithInformers(operatorClient.Informer()).
+		WithInformersQueueKeyFunc(v1helpers.ObjToString, operatorClient.Informer()).
 		WithSync(c.sync).
 		ToController(
 			"LoggingSyncer", // don't change what is passed here unless you also remove the old FooDegraded condition
@@ -49,7 +53,13 @@ func NewClusterOperatorLoggingControllerWithLogLevel(operatorClient operatorv1he
 // sync reacts to a change in prereqs by finding information that is required to match another value in the cluster. This
 // must be information that is logically "owned" by another component.
 func (c LogLevelController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	detailedSpec, _, _, err := c.operatorClient.GetOperatorState()
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "ckao.LogLevelController", trace.WithAttributes(
+		attribute.String("aaaQueueKey", syncCtx.QueueKey()),
+	))
+	defer span.End()
+
+	detailedSpec, _, _, err := c.operatorClient.GetOperatorState(ctx)
 	if errors.IsNotFound(err) && management.IsOperatorRemovable() {
 		return nil
 	}

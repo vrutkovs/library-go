@@ -1,6 +1,7 @@
 package deployment
 
 import (
+	"context"
 	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -11,8 +12,8 @@ import (
 
 // PodContainersStatus return detailed information about deployment pods and the containers status in human readable format.
 // This can be used for cluster operator condition messages or logging.
-func PodContainersStatus(deployment *appsv1.Deployment, podClient corelistersv1.PodLister) ([]string, error) {
-	deploymentPods, err := podClient.Pods(deployment.Namespace).List(labels.SelectorFromSet(deployment.Spec.Template.Labels))
+func PodContainersStatus(ctx context.Context, deployment *appsv1.Deployment, podClient corelistersv1.PodLister) ([]string, error) {
+	deploymentPods, err := podClient.Pods(deployment.Namespace).List(ctx, labels.SelectorFromSet(deployment.Spec.Template.Labels))
 	if err != nil {
 		return nil, err
 	}

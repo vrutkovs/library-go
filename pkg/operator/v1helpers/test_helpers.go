@@ -125,12 +125,12 @@ func (c *fakeStaticPodOperatorClient) GetObjectMeta() (*metav1.ObjectMeta, error
 	panic("not supported")
 }
 
-func (c *fakeStaticPodOperatorClient) GetStaticPodOperatorState() (*operatorv1.StaticPodOperatorSpec, *operatorv1.StaticPodOperatorStatus, string, error) {
+func (c *fakeStaticPodOperatorClient) GetStaticPodOperatorState(ctx context.Context) (*operatorv1.StaticPodOperatorSpec, *operatorv1.StaticPodOperatorStatus, string, error) {
 	return c.fakeStaticPodOperatorSpec, c.fakeStaticPodOperatorStatus, c.resourceVersion, nil
 }
 
-func (c *fakeStaticPodOperatorClient) GetLiveStaticPodOperatorState() (*operatorv1.StaticPodOperatorSpec, *operatorv1.StaticPodOperatorStatus, string, error) {
-	return c.GetStaticPodOperatorState()
+func (c *fakeStaticPodOperatorClient) GetLiveStaticPodOperatorState(ctx context.Context) (*operatorv1.StaticPodOperatorSpec, *operatorv1.StaticPodOperatorStatus, string, error) {
+	return c.GetStaticPodOperatorState(ctx)
 }
 
 func (c *fakeStaticPodOperatorClient) GetStaticPodOperatorStateWithQuorum(ctx context.Context) (*operatorv1.StaticPodOperatorSpec, *operatorv1.StaticPodOperatorStatus, string, error) {
@@ -221,11 +221,11 @@ func (c *fakeStaticPodOperatorClient) GetPatchedOperatorStatus() *jsonpatch.Patc
 	return c.patchedOperatorStatus
 }
 
-func (c *fakeStaticPodOperatorClient) GetOperatorState() (*operatorv1.OperatorSpec, *operatorv1.OperatorStatus, string, error) {
+func (c *fakeStaticPodOperatorClient) GetOperatorState(ctx context.Context) (*operatorv1.OperatorSpec, *operatorv1.OperatorStatus, string, error) {
 	return &c.fakeStaticPodOperatorSpec.OperatorSpec, &c.fakeStaticPodOperatorStatus.OperatorStatus, c.resourceVersion, nil
 }
 func (c *fakeStaticPodOperatorClient) GetOperatorStateWithQuorum(ctx context.Context) (*operatorv1.OperatorSpec, *operatorv1.OperatorStatus, string, error) {
-	return c.GetOperatorState()
+	return c.GetOperatorState(ctx)
 }
 func (c *fakeStaticPodOperatorClient) UpdateOperatorSpec(ctx context.Context, s string, p *operatorv1.OperatorSpec) (spec *operatorv1.OperatorSpec, resourceVersion string, err error) {
 	panic("not supported")
@@ -259,7 +259,7 @@ type fakeNodeLister struct {
 	client kubernetes.Interface
 }
 
-func (n *fakeNodeLister) List(selector labels.Selector) ([]*corev1.Node, error) {
+func (n *fakeNodeLister) List(ctx context.Context, selector labels.Selector) ([]*corev1.Node, error) {
 	nodes, err := n.client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		return nil, err
@@ -271,7 +271,7 @@ func (n *fakeNodeLister) List(selector labels.Selector) ([]*corev1.Node, error) 
 	return ret, nil
 }
 
-func (n *fakeNodeLister) Get(name string) (*corev1.Node, error) {
+func (n *fakeNodeLister) Get(_ context.Context, name string) (*corev1.Node, error) {
 	panic("implement me")
 }
 
@@ -312,12 +312,12 @@ func (c *fakeOperatorClient) GetObjectMeta() (*metav1.ObjectMeta, error) {
 	return c.fakeObjectMeta, nil
 }
 
-func (c *fakeOperatorClient) GetOperatorState() (*operatorv1.OperatorSpec, *operatorv1.OperatorStatus, string, error) {
+func (c *fakeOperatorClient) GetOperatorState(ctx context.Context) (*operatorv1.OperatorSpec, *operatorv1.OperatorStatus, string, error) {
 	return c.fakeOperatorSpec, c.fakeOperatorStatus, c.resourceVersion, nil
 }
 
 func (c *fakeOperatorClient) GetOperatorStateWithQuorum(ctx context.Context) (*operatorv1.OperatorSpec, *operatorv1.OperatorStatus, string, error) {
-	return c.GetOperatorState()
+	return c.GetOperatorState(ctx)
 }
 
 func (c *fakeOperatorClient) UpdateOperatorStatus(ctx context.Context, resourceVersion string, status *operatorv1.OperatorStatus) (*operatorv1.OperatorStatus, error) {

@@ -79,14 +79,14 @@ func (c finalizerController) sync(ctx context.Context, syncCtx factory.SyncConte
 		return nil
 	}
 
-	pods, err := c.podLister.Pods(c.namespaceName).List(labels.Everything())
+	pods, err := c.podLister.Pods(c.namespaceName).List(ctx, labels.Everything())
 	if err != nil {
 		return err
 	}
 	if len(pods) > 0 {
 		return nil
 	}
-	dses, err := c.dsLister.DaemonSets(c.namespaceName).List(labels.Everything())
+	dses, err := c.dsLister.DaemonSets(c.namespaceName).List(ctx, labels.Everything())
 	if err != nil {
 		return err
 	}

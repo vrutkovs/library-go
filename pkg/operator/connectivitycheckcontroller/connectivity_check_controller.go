@@ -16,8 +16,12 @@ import (
 	operatorcontrolplaneinformers "github.com/openshift/client-go/operatorcontrolplane/informers/externalversions"
 	listerv1alpha1 "github.com/openshift/client-go/operatorcontrolplane/listers/operatorcontrolplane/v1alpha1"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiextensionsinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
+	apiextensionslisters "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -65,6 +69,7 @@ func NewConnectivityCheckController(
 		operatorcontrolplaneClient: operatorcontrolplaneClient,
 		apiextensionsClient:        apiextensionsClient,
 		clusterVersionLister:       configInformers.Config().V1().ClusterVersions().Lister(),
+		crdLister:                  apiextensionsInformers.Apiextensions().V1().CustomResourceDefinitions().Lister(),
 		enabledByDefault:           enabledByDefault,
 	}
 
@@ -77,7 +82,7 @@ func NewConnectivityCheckController(
 
 	c.Controller = factory.New().
 		WithSync(c.Sync).
-		WithInformers(allTriggers...).
+		WithInformersQueueKeyFunc(v1helpers.ObjToString, allTriggers...).
 		ToController(
 			"ConnectivityCheckController", // don't change what is passed here unless you also remove the old FooDegraded condition
 			recorder.WithComponentSuffix("connectivity-check-controller"),
@@ -93,6 +98,7 @@ type connectivityCheckController struct {
 	apiextensionsClient        *apiextensionsclient.Clientset
 	clusterVersionLister       configv1listers.ClusterVersionLister
 	checkLister                listerv1alpha1.PodNetworkConnectivityCheckNamespaceLister
+	crdLister                  apiextensionslisters.CustomResourceDefinitionLister
 
 	podNetworkConnectivityCheckFn      PodNetworkConnectivityCheckFunc
 	podNetworkConnectivityCheckApplyFn PodNetworkConnectivityCheckApplyFunc
@@ -131,7 +137,13 @@ type unsupportedConfigOverrides struct {
 const podnetworkconnectivitychecksCRDName = "podnetworkconnectivitychecks.controlplane.operator.openshift.io"
 
 func (c *connectivityCheckController) Sync(ctx context.Context, syncContext factory.SyncContext) error {
-	operatorSpec, _, _, err := c.operatorClient.GetOperatorState()
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "ckao.connectivityCheckController", trace.WithAttributes(
+		attribute.String("aaaQueueKey", syncContext.QueueKey()),
+	))
+	defer span.End()
+
+	operatorSpec, _, _, err := c.operatorClient.GetOperatorState(ctx)
 	if err != nil {
 		return err
 	}
@@ -153,7 +165,7 @@ func (c *connectivityCheckController) Sync(ctx context.Context, syncContext fact
 	}
 
 	// do nothing while an upgrade is in progress
-	clusterVersion, err := c.clusterVersionLister.Get("version")
+	clusterVersion, err := c.clusterVersionLister.Get(ctx, "version")
 	if err != nil {
 		return err
 	}
@@ -174,7 +186,7 @@ func (c *connectivityCheckController) Sync(ctx context.Context, syncContext fact
 	}
 
 	// re-create crd if deleted during an upgrade
-	err = ensureConnectivityCheckCRDExists(ctx, syncContext, c.apiextensionsClient)
+	err = ensureConnectivityCheckCRDExists(ctx, syncContext, c.crdLister, c.apiextensionsClient)
 	if err != nil {
 		return err
 	}
@@ -196,7 +208,7 @@ func (c *connectivityCheckController) Sync(ctx context.Context, syncContext fact
 
 	var existingChecks []*v1alpha1.PodNetworkConnectivityCheck
 	if c.checkLister != nil {
-		existingChecks, err = c.checkLister.List(labels.Everything())
+		existingChecks, err = c.checkLister.List(ctx, labels.Everything())
 		if err != nil {
 			return err
 		}
@@ -231,6 +243,10 @@ func (c *connectivityCheckController) Sync(ctx context.Context, syncContext fact
 }
 
 func (c *connectivityCheckController) handlePodNetworkConnectivityCheckFn(ctx context.Context, syncContext factory.SyncContext) (sets.Set[string], error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "handlePodNetworkConnectivityCheckFn")
+	defer span.End()
+
 	newChecks, err := c.podNetworkConnectivityCheckFn(ctx, syncContext)
 	if err != nil {
 		return nil, err
@@ -271,6 +287,10 @@ func (c *connectivityCheckController) handlePodNetworkConnectivityCheckFn(ctx co
 }
 
 func (c *connectivityCheckController) handlePodNetworkConnectivityCheckApplyFn(ctx context.Context, syncContext factory.SyncContext) (sets.Set[string], error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "handlePodNetworkConnectivityCheckApplyFn")
+	defer span.End()
+
 	newChecks, err := c.podNetworkConnectivityCheckApplyFn(ctx, syncContext)
 	if err != nil {
 		return nil, err
@@ -297,8 +317,12 @@ func (c *connectivityCheckController) handlePodNetworkConnectivityCheckApplyFn(c
 //go:embed manifests
 var assets embed.FS
 
-func ensureConnectivityCheckCRDExists(ctx context.Context, syncContext factory.SyncContext, client *apiextensionsclient.Clientset) error {
-	_, err := client.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, podnetworkconnectivitychecksCRDName, metav1.GetOptions{})
+func ensureConnectivityCheckCRDExists(ctx context.Context, syncContext factory.SyncContext, crdLister apiextensionslisters.CustomResourceDefinitionLister, client *apiextensionsclient.Clientset) error {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "ensureConnectivityCheckCRDExists")
+	defer span.End()
+
+	_, err := crdLister.Get(ctx, podnetworkconnectivitychecksCRDName)
 	if err != nil && !errors.IsNotFound(err) {
 		return err
 	}

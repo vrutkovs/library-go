@@ -2,9 +2,10 @@ package csiconfigobservercontroller
 
 import (
 	"context"
-	clocktesting "k8s.io/utils/clock/testing"
 	"testing"
 	"time"
+
+	clocktesting "k8s.io/utils/clock/testing"
 
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -208,7 +209,7 @@ func TestSync(t *testing.T) {
 
 			// Check expectedObjects.driver.Spec
 			if test.expectedObjects.driver != nil {
-				actualSpec, _, _, err := ctx.operatorClient.GetOperatorState()
+				actualSpec, _, _, err := ctx.operatorClient.GetOperatorState(t.Context())
 				if err != nil {
 					t.Fatalf("Failed to get Driver: %v", err)
 				}

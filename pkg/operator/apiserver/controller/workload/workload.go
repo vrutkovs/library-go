@@ -125,7 +125,7 @@ func NewController(instanceName, operatorNamespace, targetNamespace, targetOpera
 }
 
 func (c *Controller) sync(ctx context.Context, controllerContext factory.SyncContext) error {
-	operatorSpec, operatorStatus, _, err := c.operatorClient.GetOperatorState()
+	operatorSpec, operatorStatus, _, err := c.operatorClient.GetOperatorState(ctx)
 	if err != nil {
 		return err
 	}
@@ -345,7 +345,7 @@ func (c *Controller) updateOperatorStatus(ctx context.Context, previousStatus *o
 		deploymentDegradedCondition = deploymentDegradedCondition.
 			WithStatus(operatorv1.ConditionTrue).
 			WithReason("UnavailablePod")
-		podContainersStatus, err := deployment.PodContainersStatus(workload, c.podsLister)
+		podContainersStatus, err := deployment.PodContainersStatus(ctx, workload, c.podsLister)
 		if err != nil {
 			podContainersStatus = []string{fmt.Sprintf("failed to get pod containers details: %v", err)}
 		}
@@ -442,9 +442,9 @@ func EnsureAtMostOnePodPerNode(spec *appsv1.DeploymentSpec, component string) er
 // CountNodesFuncWrapper returns a function that returns the number of nodes that match the given
 // selector. This supports determining the number of master nodes to
 // allow setting the deployment replica count to match.
-func CountNodesFuncWrapper(nodeLister corev1listers.NodeLister) func(nodeSelector map[string]string) (*int32, error) {
+func CountNodesFuncWrapper(ctx context.Context, nodeLister corev1listers.NodeLister) func(nodeSelector map[string]string) (*int32, error) {
 	return func(nodeSelector map[string]string) (*int32, error) {
-		nodes, err := nodeLister.List(labels.SelectorFromSet(nodeSelector))
+		nodes, err := nodeLister.List(ctx, labels.SelectorFromSet(nodeSelector))
 		if err != nil {
 			return nil, err
 		}

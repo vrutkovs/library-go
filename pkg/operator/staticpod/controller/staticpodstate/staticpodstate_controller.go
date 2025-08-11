@@ -21,6 +21,10 @@ import (
 	"github.com/openshift/library-go/pkg/operator/management"
 	"github.com/openshift/library-go/pkg/operator/status"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // StaticPodStateController is a controller that watches static pods and will produce a failing status if the
@@ -30,6 +34,7 @@ type StaticPodStateController struct {
 	targetNamespace        string
 	staticPodName          string
 	operandName            string
+	tp                     trace.TracerProvider
 
 	operatorClient  v1helpers.StaticPodOperatorClient
 	podsGetter      corev1client.PodsGetter
@@ -45,6 +50,7 @@ func NewStaticPodStateController(
 	podsGetter corev1client.PodsGetter,
 	versionRecorder status.VersionGetter,
 	eventRecorder events.Recorder,
+	tp trace.TracerProvider,
 ) factory.Controller {
 	c := &StaticPodStateController{
 		controllerInstanceName: factory.ControllerInstanceName(instanceName, "StaticPodState"),
@@ -54,9 +60,17 @@ func NewStaticPodStateController(
 		operatorClient:         operatorClient,
 		podsGetter:             podsGetter,
 		versionRecorder:        versionRecorder,
+		tp:                     tp,
 	}
 	return factory.New().
-		WithInformers(
+		WithFilteredEventsInformersQueueKeyFunc(v1helpers.ObjToString,
+			func(obj interface{}) bool {
+				if pod, ok := obj.(*v1.Pod); ok {
+					app, ok := pod.Labels["app"]
+					return ok && app == "openshift-kube-apiserver"
+				}
+				return true
+			},
 			operatorClient.Informer(),
 			kubeInformersForTargetNamespace.Core().V1().Pods().Informer(),
 		).
@@ -77,12 +91,22 @@ func describeWaitingContainerState(waiting *v1.ContainerStateWaiting) string {
 }
 
 func (c *StaticPodStateController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	operatorSpec, originalOperatorStatus, _, err := c.operatorClient.GetStaticPodOperatorState()
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "ckao.StaticPodStateController", trace.WithAttributes(
+		attribute.String("controllerInstanceName", c.controllerInstanceName),
+		attribute.String("operandName", c.operandName),
+		attribute.String("staticPodName", c.staticPodName),
+		attribute.String("targetNamespace", c.targetNamespace),
+		attribute.String("aaaQueueKey", syncCtx.QueueKey()),
+	))
+	defer span.End()
+
+	operatorSpec, originalOperatorStatus, _, err := c.operatorClient.GetStaticPodOperatorState(ctx)
 	if err != nil {
 		return err
 	}
 
-	if !management.IsOperatorManaged(operatorSpec.ManagementState) {
+	if !management.IsOperatorManaged(ctx, operatorSpec.ManagementState) {
 		return nil
 	}
 
@@ -91,51 +115,7 @@ func (c *StaticPodStateController) sync(ctx context.Context, syncCtx factory.Syn
 	images := sets.New[string]()
 	podsFound := false
 	for _, node := range originalOperatorStatus.NodeStatuses {
-		pod, err := c.podsGetter.Pods(c.targetNamespace).Get(ctx, mirrorPodNameForNode(c.staticPodName, node.NodeName), metav1.GetOptions{})
-		if err != nil {
-			if !apierrors.IsNotFound(err) {
-				errs = append(errs, err)
-				failingErrorCount++
-			}
-			continue
-		}
-		podsFound = true
-		images.Insert(pod.Spec.Containers[0].Image)
-
-		for i, containerStatus := range pod.Status.ContainerStatuses {
-			switch {
-			case containerStatus.State.Waiting != nil && containerStatus.State.Waiting.Reason != "PodInitializing":
-				// if container status is waiting, but not initializing pod, increase the failing error counter
-				// this usually means the container is stuck on initializing network
-				errs = append(errs, fmt.Errorf("pod/%s container %q is waiting: %s", pod.Name, containerStatus.Name, describeWaitingContainerState(containerStatus.State.Waiting)))
-				failingErrorCount++
-			case containerStatus.State.Running != nil:
-				maxNormalStartupDuration := 30 * time.Second // assume 30s for containers without probes
-				if i < len(pod.Spec.Containers) {            // should always happen
-					spec := pod.Spec.Containers[i]
-					if spec.LivenessProbe != nil {
-						maxNormalStartupDuration = maxFailureDuration(spec.LivenessProbe)
-					}
-					grace := 10 * time.Second
-					maxNormalStartupDuration = max(maxNormalStartupDuration, maxFailureDuration(spec.ReadinessProbe)) + maxFailureDuration(spec.StartupProbe) + grace
-				}
-
-				if !containerStatus.Ready && time.Now().After(containerStatus.State.Running.StartedAt.Add(maxNormalStartupDuration)) {
-					// When container is not ready, we can't determine whether the operator is failing or not and every container will become not
-					// ready when created, so do not blip the failing state for it.
-					// We will still reflect the container not ready state in error conditions, but we don't set the operator as failed.
-					errs = append(errs, fmt.Errorf("pod/%s container %q started at %s is still not ready", pod.Name, containerStatus.Name, containerStatus.State.Running.StartedAt.Time))
-				}
-			case containerStatus.State.Terminated != nil:
-				// Containers can be terminated gracefully to trigger certificate reload, do not report these as failures.
-				errs = append(errs, fmt.Errorf("pod/%s container %q is terminated: %s: %s", pod.Name, containerStatus.Name, containerStatus.State.Terminated.Reason,
-					containerStatus.State.Terminated.Message))
-				// Only in case when the termination was caused by error.
-				if containerStatus.State.Terminated.ExitCode != 0 {
-					failingErrorCount++
-				}
-			}
-		}
+		c.processNode(ctx, node, errs, &failingErrorCount, &images, &podsFound)
 	}
 
 	switch {
@@ -186,6 +166,64 @@ func (c *StaticPodStateController) sync(ctx context.Context, syncCtx factory.Syn
 		return updateError
 	}
 	return err
+}
+
+func (c *StaticPodStateController) processNode(ctx context.Context, node operatorv1.NodeStatus, errs []error, failingErrorCount *int, images *sets.Set[string], podsFound *bool) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "processNode", trace.WithAttributes(
+		attribute.String("controllerInstanceName", c.controllerInstanceName),
+		attribute.String("operandName", c.operandName),
+		attribute.String("staticPodName", c.staticPodName),
+		attribute.String("targetNamespace", c.targetNamespace),
+		attribute.String("nodeName", node.NodeName),
+	))
+	defer span.End()
+
+	pod, err := c.podsGetter.Pods(c.targetNamespace).Get(ctx, mirrorPodNameForNode(c.staticPodName, node.NodeName), metav1.GetOptions{})
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			errs = append(errs, err)
+			(*failingErrorCount)++
+		}
+		return
+	}
+	(*podsFound) = true
+	images.Insert(pod.Spec.Containers[0].Image)
+
+	for i, containerStatus := range pod.Status.ContainerStatuses {
+		switch {
+		case containerStatus.State.Waiting != nil && containerStatus.State.Waiting.Reason != "PodInitializing":
+			// if container status is waiting, but not initializing pod, increase the failing error counter
+			// this usually means the container is stuck on initializing network
+			errs = append(errs, fmt.Errorf("pod/%s container %q is waiting: %s", pod.Name, containerStatus.Name, describeWaitingContainerState(containerStatus.State.Waiting)))
+			(*failingErrorCount)++
+		case containerStatus.State.Running != nil:
+			maxNormalStartupDuration := 30 * time.Second // assume 30s for containers without probes
+			if i < len(pod.Spec.Containers) {            // should always happen
+				spec := pod.Spec.Containers[i]
+				if spec.LivenessProbe != nil {
+					maxNormalStartupDuration = maxFailureDuration(spec.LivenessProbe)
+				}
+				grace := 10 * time.Second
+				maxNormalStartupDuration = max(maxNormalStartupDuration, maxFailureDuration(spec.ReadinessProbe)) + maxFailureDuration(spec.StartupProbe) + grace
+			}
+
+			if !containerStatus.Ready && time.Now().After(containerStatus.State.Running.StartedAt.Add(maxNormalStartupDuration)) {
+				// When container is not ready, we can't determine whether the operator is failing or not and every container will become not
+				// ready when created, so do not blip the failing state for it.
+				// We will still reflect the container not ready state in error conditions, but we don't set the operator as failed.
+				errs = append(errs, fmt.Errorf("pod/%s container %q started at %s is still not ready", pod.Name, containerStatus.Name, containerStatus.State.Running.StartedAt.Time))
+			}
+		case containerStatus.State.Terminated != nil:
+			// Containers can be terminated gracefully to trigger certificate reload, do not report these as failures.
+			errs = append(errs, fmt.Errorf("pod/%s container %q is terminated: %s: %s", pod.Name, containerStatus.Name, containerStatus.State.Terminated.Reason,
+				containerStatus.State.Terminated.Message))
+			// Only in case when the termination was caused by error.
+			if containerStatus.State.Terminated.ExitCode != 0 {
+				(*failingErrorCount)++
+			}
+		}
+	}
 }
 
 func maxFailureDuration(p *v1.Probe) time.Duration {

@@ -1,6 +1,7 @@
 package apiserver
 
 import (
+	"context"
 	"fmt"
 
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -23,7 +24,7 @@ func NewAuditObserver(pathGetter AuditPolicyPathGetterFunc) configobserver.Obser
 		apiServerArgumentsAuditPath = []string{"apiServerArguments", "audit-policy-file"}
 	)
 
-	return func(genericListers configobserver.Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observed map[string]interface{}, _ []error) {
+	return func(ctx context.Context, genericListers configobserver.Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observed map[string]interface{}, _ []error) {
 		defer func() {
 			observed = configobserver.Pruned(observed, apiServerArgumentsAuditPath)
 		}()
@@ -34,7 +35,7 @@ func NewAuditObserver(pathGetter AuditPolicyPathGetterFunc) configobserver.Obser
 		// some other entity (default config in bindata ) must ensure to default the configuration.
 		// otherwise, the apiserver won't have a path to audit policy file and it will fail to start.
 		listers := genericListers.(APIServerLister)
-		apiServer, err := listers.APIServerLister().Get("cluster")
+		apiServer, err := listers.APIServerLister().Get(ctx, "cluster")
 		if err != nil {
 			if k8serrors.IsNotFound(err) {
 				klog.Warningf("apiserver.config.openshift.io/cluster: not found")

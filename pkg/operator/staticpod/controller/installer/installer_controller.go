@@ -12,6 +12,9 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 
 	operatorv1 "github.com/openshift/api/operator/v1"
 	applyoperatorv1 "github.com/openshift/client-go/operator/applyconfigurations/operator/v1"
@@ -34,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	corelisterv1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 	"k8s.io/utils/ptr"
@@ -54,7 +58,7 @@ const (
 var podTemplate []byte
 
 type OperatorClient interface {
-	GetStaticPodOperatorState() (spec *operatorv1.StaticPodOperatorSpec, status *operatorv1.StaticPodOperatorStatus, resourceVersion string, err error)
+	GetStaticPodOperatorState(ctx context.Context) (spec *operatorv1.StaticPodOperatorSpec, status *operatorv1.StaticPodOperatorStatus, resourceVersion string, err error)
 	GetStaticPodOperatorStateWithQuorum(ctx context.Context) (spec *operatorv1.StaticPodOperatorSpec, status *operatorv1.StaticPodOperatorStatus, resourceVersion string, err error)
 	ApplyStaticPodOperatorStatus(ctx context.Context, fieldManager string, applyConfiguration *applyoperatorv1.StaticPodOperatorStatusApplyConfiguration) (err error)
 }
@@ -94,6 +98,7 @@ type InstallerController struct {
 	configMapsGetter corev1client.ConfigMapsGetter
 	secretsGetter    corev1client.SecretsGetter
 	podsGetter       corev1client.PodsGetter
+	podsLister       corelisterv1.PodNamespaceLister
 	eventRecorder    events.Recorder
 	now              func() time.Time // for test plumbing
 
@@ -121,7 +126,7 @@ type InstallerController struct {
 }
 
 // InstallerPodMutationFunc is a function that has a chance at changing the installer pod before it is created
-type InstallerPodMutationFunc func(pod *corev1.Pod, nodeName string, operatorSpec *operatorv1.StaticPodOperatorSpec, revision int32) error
+type InstallerPodMutationFunc func(ctx context.Context, pod *corev1.Pod, nodeName string, operatorSpec *operatorv1.StaticPodOperatorSpec, revision int32) error
 
 func (c *InstallerController) WithInstallerPodMutationFn(installerPodMutationFn InstallerPodMutationFunc) *InstallerController {
 	c.installerPodMutationFns = append(c.installerPodMutationFns, installerPodMutationFn)
@@ -183,6 +188,7 @@ func NewInstallerController(
 	configMapsGetter corev1client.ConfigMapsGetter,
 	secretsGetter corev1client.SecretsGetter,
 	podsGetter corev1client.PodsGetter,
+	podsLister corelisterv1.PodNamespaceLister,
 	eventRecorder events.Recorder,
 ) *InstallerController {
 	c := &InstallerController{
@@ -197,6 +203,7 @@ func NewInstallerController(
 		configMapsGetter: configMapsGetter,
 		secretsGetter:    secretsGetter,
 		podsGetter:       podsGetter,
+		podsLister:       podsLister,
 		eventRecorder:    eventRecorder.WithComponentSuffix("installer-controller"),
 		now:              time.Now,
 		startupMonitorEnabled: func() (bool, error) {
@@ -213,7 +220,7 @@ func NewInstallerController(
 	c.ensureRequiredResourcesExistFn = c.ensureRequiredResourcesExist
 	c.manageInstallationPodsFn = c.manageInstallationPods
 	c.factory = factory.New().
-		WithInformers(
+		WithInformersQueueKeyFunc(v1helpers.ObjToString,
 			operatorClient.Informer(),
 			// informers are needed here because their Getter are cached lister based
 			kubeInformersForTargetNamespace.Core().V1().Pods().Informer(),
@@ -249,7 +256,11 @@ func (c InstallerController) ControllerInstanceName() string {
 // - a list of error strings to be stored in the nodeStatus.lastFailedRevisionsErrors
 // - a timestamp of the pod state event
 func (c *InstallerController) getStaticPodState(ctx context.Context, nodeName string) (staticPodState, string, string, []string, time.Time, error) {
-	pod, err := c.podsGetter.Pods(c.targetNamespace).Get(ctx, mirrorPodNameForNode(c.staticPodName, nodeName), metav1.GetOptions{})
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "getStaticPodState")
+	defer span.End()
+
+	pod, err := c.podsLister.Get(ctx, mirrorPodNameForNode(c.staticPodName, nodeName))
 	if err != nil {
 		return staticPodStatePending, "", "", nil, time.Time{}, err
 	}
@@ -327,6 +338,10 @@ type staticPodStateFunc func(ctx context.Context, nodeName string) (state static
 // - ready
 // - at the revision claimed in CurrentRevision.
 func nodeToStartRevisionWith(ctx context.Context, getStaticPodStateFn staticPodStateFunc, nodes []operatorv1.NodeStatus) (int, string, error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "nodeToStartRevisionWith")
+	defer span.End()
+
 	if len(nodes) == 0 {
 		return 0, "", fmt.Errorf("nodes array cannot be empty")
 	}
@@ -428,13 +443,17 @@ func nodeToStartRevisionWith(ctx context.Context, getStaticPodStateFn staticPodS
 // We delay to avoid issues where the the LB doesn't observe readyz for ready pods as quickly as kubelet does.
 // See godoc on minReadyDuration.
 func (c *InstallerController) timeToWaitBeforeInstallingNextPod(ctx context.Context, nodeStatuses []operatorv1.NodeStatus) time.Duration {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "timeToWaitBeforeInstallingNextPod")
+	defer span.End()
+
 	if c.minReadyDuration == 0 {
 		return 0
 	}
 	// long enough that we would notice if something went really wrong.  Short enough that a customer cluster will still function
 	minDurationPodHasBeenReady := 600 * time.Second
 	for _, nodeStatus := range nodeStatuses {
-		pod, err := c.podsGetter.Pods(c.targetNamespace).Get(ctx, mirrorPodNameForNode(c.staticPodName, nodeStatus.NodeName), metav1.GetOptions{})
+		pod, err := c.podsLister.Get(ctx, mirrorPodNameForNode(c.staticPodName, nodeStatus.NodeName))
 		if err != nil {
 			// if we have an issue getting the static pod, just don't bother delaying for minReadySeconds at all
 			continue
@@ -464,6 +483,10 @@ func (c *InstallerController) timeToWaitBeforeInstallingNextPod(ctx context.Cont
 // manageInstallationPods takes care of creating content for the static pods to install.
 // returns whether or not requeue and if an error happened when updating status.  Normally it updates status itself.
 func (c *InstallerController) manageInstallationPods(ctx context.Context, operatorSpec *operatorv1.StaticPodOperatorSpec, originalOperatorStatus *operatorv1.StaticPodOperatorStatus) (bool, time.Duration, *operatorv1.NodeStatus, func(), error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "manageInstallationPods")
+	defer span.End()
+
 	operatorStatus := originalOperatorStatus.DeepCopy()
 
 	if len(operatorStatus.NodeStatuses) == 0 {
@@ -728,9 +751,13 @@ func prepareInstallerDegradedConditionApplyConfigurationFor(err error) *applyope
 
 // newNodeStateForInstallInProgress returns the new NodeState
 func (c *InstallerController) newNodeStateForInstallInProgress(ctx context.Context, currNodeState *operatorv1.NodeStatus, latestRevisionAvailable int32) (status *operatorv1.NodeStatus, installerPodFailed bool, reason string, err error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "ensureInstallerPod")
+	defer span.End()
+
 	pendingNewRevision := latestRevisionAvailable > currNodeState.TargetRevision
 	installerPodName := getInstallerPodName(currNodeState)
-	installerPod, err := c.podsGetter.Pods(c.targetNamespace).Get(ctx, installerPodName, metav1.GetOptions{})
+	installerPod, err := c.podsLister.Get(ctx, installerPodName)
 	if apierrors.IsNotFound(err) {
 		if !pendingNewRevision {
 			// installer pod has disappeared before we saw it's termination state. Retry like if it had never existed.
@@ -918,6 +945,10 @@ func getInstallerPodName(ns *operatorv1.NodeStatus) string {
 
 // ensureInstallerPod creates the installer pod with the secrets required to if it does not exist already
 func (c *InstallerController) ensureInstallerPod(ctx context.Context, operatorSpec *operatorv1.StaticPodOperatorSpec, ns *operatorv1.NodeStatus) error {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "ensureInstallerPod")
+	defer span.End()
+
 	pod := resourceread.ReadPodV1OrDie(podTemplate)
 
 	pod.Namespace = c.targetNamespace
@@ -991,7 +1022,7 @@ func (c *InstallerController) ensureInstallerPod(ctx context.Context, operatorSp
 
 	// Some owners need to change aspects of the pod.  Things like arguments for instance
 	for _, fn := range c.installerPodMutationFns {
-		if err := fn(pod, ns.NodeName, operatorSpec, ns.TargetRevision); err != nil {
+		if err := fn(ctx, pod, ns.NodeName, operatorSpec, ns.TargetRevision); err != nil {
 			return err
 		}
 	}
@@ -1001,6 +1032,10 @@ func (c *InstallerController) ensureInstallerPod(ctx context.Context, operatorSp
 }
 
 func (c *InstallerController) setOwnerRefs(ctx context.Context, revision int32) ([]metav1.OwnerReference, error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "setOwnerRefs")
+	defer span.End()
+
 	ownerReferences := []metav1.OwnerReference{}
 	statusConfigMap, err := c.configMapsGetter.ConfigMaps(c.targetNamespace).Get(ctx, fmt.Sprintf("revision-status-%d", revision), metav1.GetOptions{})
 	if err == nil {
@@ -1019,6 +1054,10 @@ func getInstallerPodImageFromEnv() string {
 }
 
 func (c InstallerController) ensureSecretRevisionResourcesExists(ctx context.Context, secrets []revision.RevisionResource, latestRevisionNumber int32) error {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "ensureSecretRevisionResourcesExists")
+	defer span.End()
+
 	missing := sets.New[string]()
 	for _, secret := range secrets {
 		if secret.Optional {
@@ -1040,6 +1079,10 @@ func (c InstallerController) ensureSecretRevisionResourcesExists(ctx context.Con
 }
 
 func (c InstallerController) ensureConfigMapRevisionResourcesExists(ctx context.Context, configs []revision.RevisionResource, latestRevisionNumber int32) error {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "ensureConfigMapRevisionResourcesExists")
+	defer span.End()
+
 	missing := sets.New[string]()
 	for _, config := range configs {
 		if config.Optional {
@@ -1061,6 +1104,10 @@ func (c InstallerController) ensureConfigMapRevisionResourcesExists(ctx context.
 }
 
 func (c InstallerController) ensureUnrevisionedSecretResourcesExists(ctx context.Context, secrets []UnrevisionedResource) error {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "ensureUnrevisionedSecretResourcesExists")
+	defer span.End()
+
 	missing := sets.New[string]()
 	for _, secret := range secrets {
 		if secret.Optional {
@@ -1081,6 +1128,10 @@ func (c InstallerController) ensureUnrevisionedSecretResourcesExists(ctx context
 }
 
 func (c InstallerController) ensureUnrevisionedConfigMapResourcesExists(ctx context.Context, configs []UnrevisionedResource) error {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "ensureUnrevisionedConfigMapResourcesExists")
+	defer span.End()
+
 	missing := sets.New[string]()
 	for _, config := range configs {
 		if config.Optional {
@@ -1102,6 +1153,12 @@ func (c InstallerController) ensureUnrevisionedConfigMapResourcesExists(ctx cont
 
 // ensureRequiredResourcesExist makes sure that all non-optional resources are ready or it will return an error to trigger a requeue so that we try again.
 func (c InstallerController) ensureRequiredResourcesExist(ctx context.Context, revisionNumber int32) error {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "ensureRequiredResourcesExist", trace.WithAttributes(
+		attribute.Int64("revisionNumber", int64(revisionNumber)),
+	))
+	defer span.End()
+
 	errs := []error{}
 
 	errs = append(errs, c.ensureUnrevisionedConfigMapResourcesExists(ctx, c.certConfigMaps))
@@ -1124,7 +1181,13 @@ func (c InstallerController) ensureRequiredResourcesExist(ctx context.Context, r
 }
 
 func (c *InstallerController) Sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	operatorSpec, originalOperatorStatus, operatorResourceVersion, err := c.operatorClient.GetStaticPodOperatorState()
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "ckao.InstallerController", trace.WithAttributes(
+		attribute.String("aaaQueueKey", syncCtx.QueueKey()),
+	))
+	defer span.End()
+
+	operatorSpec, originalOperatorStatus, operatorResourceVersion, err := c.operatorClient.GetStaticPodOperatorState(ctx)
 	if err != nil {
 		return err
 	}
@@ -1160,7 +1223,7 @@ func (c *InstallerController) Sync(ctx context.Context, syncCtx factory.SyncCont
 		c.lastPodOperatorAppliedRV = 0
 	}
 
-	if !management.IsOperatorManaged(operatorSpec.ManagementState) {
+	if !management.IsOperatorManaged(ctx, operatorSpec.ManagementState) {
 		return nil
 	}
 

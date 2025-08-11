@@ -1,10 +1,11 @@
 package masterurl
 
 import (
-	clocktesting "k8s.io/utils/clock/testing"
 	"reflect"
 	"testing"
 	"time"
+
+	clocktesting "k8s.io/utils/clock/testing"
 
 	configv1 "github.com/openshift/api/config/v1"
 	configlistersv1 "github.com/openshift/client-go/config/listers/config/v1"
@@ -96,7 +97,7 @@ func TestObserveInfraID(t *testing.T) {
 			listers := FakeInfrastructureLister{
 				InfrastructureLister_: configlistersv1.NewInfrastructureLister(indexer),
 			}
-			result, errs := ObserveMasterURL(listers, events.NewInMemoryRecorder("infraid", clocktesting.NewFakePassiveClock(time.Now())), test.input)
+			result, errs := ObserveMasterURL(t.Context(), listers, events.NewInMemoryRecorder("infraid", clocktesting.NewFakePassiveClock(time.Now())), test.input)
 			if len(errs) > 0 {
 				t.Fatal(errs)
 			} else {

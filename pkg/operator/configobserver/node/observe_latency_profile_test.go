@@ -1,10 +1,11 @@
 package node
 
 import (
-	clocktesting "k8s.io/utils/clock/testing"
 	"strconv"
 	"testing"
 	"time"
+
+	clocktesting "k8s.io/utils/clock/testing"
 
 	"github.com/google/go-cmp/cmp"
 
@@ -72,7 +73,7 @@ func multiScenarioLatencyProfilesTest(t *testing.T, observeFn configobserver.Obs
 			}
 
 			// act
-			actualObservedConfig, err := observeFn(listers, eventRecorder, scenario.existingConfig)
+			actualObservedConfig, err := observeFn(t.Context(), listers, eventRecorder, scenario.existingConfig)
 
 			// validate
 			if len(err) > 0 {

@@ -20,6 +20,10 @@ import (
 	coreclientv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // TODO find  way to create a registry of these based on struct mapping or some such that forces users to get this right
@@ -91,6 +95,11 @@ func ApplySecret(ctx context.Context, client coreclientv1.SecretsGetter, recorde
 
 // ApplyNamespace merges objectmeta, does not worry about anything else
 func ApplyNamespaceImproved(ctx context.Context, client coreclientv1.NamespacesGetter, recorder events.Recorder, required *corev1.Namespace, cache ResourceCache) (*corev1.Namespace, bool, error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "ApplyNamespaceImproved", trace.WithAttributes(
+		attribute.String("name", required.Name),
+	))
+	defer span.End()
 	existing, err := client.Namespaces().Get(ctx, required.Name, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		requiredCopy := required.DeepCopy()
@@ -132,6 +141,12 @@ func ApplyNamespaceImproved(ctx context.Context, client coreclientv1.NamespacesG
 // TODO, since this cannot determine whether changes in `existing` are due to legitimate actors (api server) or illegitimate ones (users), we cannot update.
 // TODO I've special cased the selector for now
 func ApplyServiceImproved(ctx context.Context, client coreclientv1.ServicesGetter, recorder events.Recorder, requiredOriginal *corev1.Service, cache ResourceCache) (*corev1.Service, bool, error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "ApplyServiceImproved", trace.WithAttributes(
+		attribute.String("name", requiredOriginal.Name),
+		attribute.String("namespace", requiredOriginal.Namespace),
+	))
+	defer span.End()
 	required := requiredOriginal.DeepCopy()
 	err := SetSpecHashAnnotation(&required.ObjectMeta, required.Spec)
 	if err != nil {
@@ -190,6 +205,12 @@ func ApplyServiceImproved(ctx context.Context, client coreclientv1.ServicesGette
 
 // ApplyPod merges objectmeta, does not worry about anything else
 func ApplyPodImproved(ctx context.Context, client coreclientv1.PodsGetter, recorder events.Recorder, required *corev1.Pod, cache ResourceCache) (*corev1.Pod, bool, error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "ApplyPodImproved", trace.WithAttributes(
+		attribute.String("name", required.Name),
+		attribute.String("namespace", required.Namespace),
+	))
+	defer span.End()
 	existing, err := client.Pods(required.Namespace).Get(ctx, required.Name, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		requiredCopy := required.DeepCopy()
@@ -228,6 +249,12 @@ func ApplyPodImproved(ctx context.Context, client coreclientv1.PodsGetter, recor
 
 // ApplyServiceAccount merges objectmeta, does not worry about anything else
 func ApplyServiceAccountImproved(ctx context.Context, client coreclientv1.ServiceAccountsGetter, recorder events.Recorder, required *corev1.ServiceAccount, cache ResourceCache) (*corev1.ServiceAccount, bool, error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "ApplyServiceAccountImproved", trace.WithAttributes(
+		attribute.String("name", required.Name),
+		attribute.String("namespace", required.Namespace),
+	))
+	defer span.End()
 	existing, err := client.ServiceAccounts(required.Namespace).Get(ctx, required.Name, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		requiredCopy := required.DeepCopy()
@@ -264,6 +291,12 @@ func ApplyServiceAccountImproved(ctx context.Context, client coreclientv1.Servic
 
 // ApplyConfigMap merges objectmeta, requires data
 func ApplyConfigMapImproved(ctx context.Context, client coreclientv1.ConfigMapsGetter, recorder events.Recorder, required *corev1.ConfigMap, cache ResourceCache) (*corev1.ConfigMap, bool, error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "ApplyConfigMapImproved", trace.WithAttributes(
+		attribute.String("name", required.Name),
+		attribute.String("namespace", required.Namespace),
+	))
+	defer span.End()
 	existing, err := client.ConfigMaps(required.Namespace).Get(ctx, required.Name, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		requiredCopy := required.DeepCopy()
@@ -359,6 +392,12 @@ func ApplyConfigMapImproved(ctx context.Context, client coreclientv1.ConfigMapsG
 // ApplySecret merges objectmeta, requires data
 func ApplySecretImproved(ctx context.Context, client coreclientv1.SecretsGetter, recorder events.Recorder, requiredInput *corev1.Secret, cache ResourceCache) (*corev1.Secret, bool, error) {
 	// copy the stringData to data.  Error on a data content conflict inside required.  This is usually a bug.
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "ApplySecretImproved", trace.WithAttributes(
+		attribute.String("name", requiredInput.Name),
+		attribute.String("namespace", requiredInput.Namespace),
+	))
+	defer span.End()
 
 	existing, err := client.Secrets(requiredInput.Namespace).Get(ctx, requiredInput.Name, metav1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
@@ -478,6 +517,14 @@ func SyncPartialConfigMap(ctx context.Context, client coreclientv1.ConfigMapsGet
 }
 
 func syncPartialConfigMap(ctx context.Context, client coreclientv1.ConfigMapsGetter, recorder events.Recorder, sourceNamespace, sourceName, targetNamespace, targetName string, syncedKeys sets.Set[string], ownerRefs []metav1.OwnerReference, labels map[string]string) (*corev1.ConfigMap, bool, error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "syncPartialConfigMap", trace.WithAttributes(
+		attribute.String("sourceName", sourceName),
+		attribute.String("sourceNamespace", sourceNamespace),
+		attribute.String("targetName", targetName),
+		attribute.String("targetNamespace", targetNamespace),
+	))
+	defer span.End()
 	source, err := client.ConfigMaps(sourceNamespace).Get(ctx, sourceName, metav1.GetOptions{})
 	switch {
 	case apierrors.IsNotFound(err):
@@ -520,6 +567,12 @@ func syncPartialConfigMap(ctx context.Context, client coreclientv1.ConfigMapsGet
 }
 
 func deleteConfigMapSyncTarget(ctx context.Context, client coreclientv1.ConfigMapsGetter, recorder events.Recorder, targetNamespace, targetName string) (bool, error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "deleteConfigMapSyncTarget", trace.WithAttributes(
+		attribute.String("name", targetName),
+		attribute.String("namespace", targetNamespace),
+	))
+	defer span.End()
 	// This goal of this additional GET is to avoid reaching the API with a DELETE request
 	// in case the target doesn't exist. This is useful when using a cached client.
 	_, err := client.ConfigMaps(targetNamespace).Get(ctx, targetName, metav1.GetOptions{})
@@ -554,6 +607,15 @@ func SyncPartialSecret(ctx context.Context, client coreclientv1.SecretsGetter, r
 }
 
 func syncPartialSecret(ctx context.Context, client coreclientv1.SecretsGetter, recorder events.Recorder, sourceNamespace, sourceName, targetNamespace, targetName string, syncedKeys sets.Set[string], ownerRefs []metav1.OwnerReference, labels map[string]string) (*corev1.Secret, bool, error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "syncPartialSecret", trace.WithAttributes(
+		attribute.String("sourceName", sourceName),
+		attribute.String("sourceNamespace", sourceNamespace),
+		attribute.String("targetName", targetName),
+		attribute.String("targetNamespace", targetNamespace),
+	))
+	defer span.End()
+
 	source, err := client.Secrets(sourceNamespace).Get(ctx, sourceName, metav1.GetOptions{})
 	switch {
 	case apierrors.IsNotFound(err):
@@ -614,6 +676,12 @@ func syncPartialSecret(ctx context.Context, client coreclientv1.SecretsGetter, r
 }
 
 func deleteSecretSyncTarget(ctx context.Context, client coreclientv1.SecretsGetter, recorder events.Recorder, targetNamespace, targetName string) (bool, error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "deleteSecretSyncTarget", trace.WithAttributes(
+		attribute.String("name", targetName),
+		attribute.String("namespace", targetNamespace),
+	))
+	defer span.End()
 	err := client.Secrets(targetNamespace).Delete(ctx, targetName, metav1.DeleteOptions{})
 	if apierrors.IsNotFound(err) {
 		return false, nil
@@ -626,6 +694,11 @@ func deleteSecretSyncTarget(ctx context.Context, client coreclientv1.SecretsGett
 }
 
 func DeleteNamespace(ctx context.Context, client coreclientv1.NamespacesGetter, recorder events.Recorder, required *corev1.Namespace) (*corev1.Namespace, bool, error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "DeleteNamespace", trace.WithAttributes(
+		attribute.String("name", required.Name),
+	))
+	defer span.End()
 	err := client.Namespaces().Delete(ctx, required.Name, metav1.DeleteOptions{})
 	if err != nil && apierrors.IsNotFound(err) {
 		return nil, false, nil
@@ -638,6 +711,12 @@ func DeleteNamespace(ctx context.Context, client coreclientv1.NamespacesGetter, 
 }
 
 func DeleteService(ctx context.Context, client coreclientv1.ServicesGetter, recorder events.Recorder, required *corev1.Service) (*corev1.Service, bool, error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "DeleteService", trace.WithAttributes(
+		attribute.String("name", required.Name),
+		attribute.String("namespace", required.Namespace),
+	))
+	defer span.End()
 	err := client.Services(required.Namespace).Delete(ctx, required.Name, metav1.DeleteOptions{})
 	if err != nil && apierrors.IsNotFound(err) {
 		return nil, false, nil
@@ -650,6 +729,12 @@ func DeleteService(ctx context.Context, client coreclientv1.ServicesGetter, reco
 }
 
 func DeletePod(ctx context.Context, client coreclientv1.PodsGetter, recorder events.Recorder, required *corev1.Pod) (*corev1.Pod, bool, error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "DeletePod", trace.WithAttributes(
+		attribute.String("name", required.Name),
+		attribute.String("namespace", required.Namespace),
+	))
+	defer span.End()
 	err := client.Pods(required.Namespace).Delete(ctx, required.Name, metav1.DeleteOptions{})
 	if err != nil && apierrors.IsNotFound(err) {
 		return nil, false, nil
@@ -662,6 +747,12 @@ func DeletePod(ctx context.Context, client coreclientv1.PodsGetter, recorder eve
 }
 
 func DeleteServiceAccount(ctx context.Context, client coreclientv1.ServiceAccountsGetter, recorder events.Recorder, required *corev1.ServiceAccount) (*corev1.ServiceAccount, bool, error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "DeleteServiceAccount", trace.WithAttributes(
+		attribute.String("name", required.Name),
+		attribute.String("namespace", required.Namespace),
+	))
+	defer span.End()
 	err := client.ServiceAccounts(required.Namespace).Delete(ctx, required.Name, metav1.DeleteOptions{})
 	if err != nil && apierrors.IsNotFound(err) {
 		return nil, false, nil
@@ -674,6 +765,12 @@ func DeleteServiceAccount(ctx context.Context, client coreclientv1.ServiceAccoun
 }
 
 func DeleteConfigMap(ctx context.Context, client coreclientv1.ConfigMapsGetter, recorder events.Recorder, required *corev1.ConfigMap) (*corev1.ConfigMap, bool, error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "DeleteConfigMap", trace.WithAttributes(
+		attribute.String("name", required.Name),
+		attribute.String("namespace", required.Namespace),
+	))
+	defer span.End()
 	err := client.ConfigMaps(required.Namespace).Delete(ctx, required.Name, metav1.DeleteOptions{})
 	if err != nil && apierrors.IsNotFound(err) {
 		return nil, false, nil
@@ -686,6 +783,12 @@ func DeleteConfigMap(ctx context.Context, client coreclientv1.ConfigMapsGetter, 
 }
 
 func DeleteSecret(ctx context.Context, client coreclientv1.SecretsGetter, recorder events.Recorder, required *corev1.Secret) (*corev1.Secret, bool, error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "DeleteSecret", trace.WithAttributes(
+		attribute.String("name", required.Name),
+		attribute.String("namespace", required.Namespace),
+	))
+	defer span.End()
 	err := client.Secrets(required.Namespace).Delete(ctx, required.Name, metav1.DeleteOptions{})
 	if err != nil && apierrors.IsNotFound(err) {
 		return nil, false, nil

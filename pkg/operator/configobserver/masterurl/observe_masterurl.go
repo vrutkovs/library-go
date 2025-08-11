@@ -1,6 +1,8 @@
 package masterurl
 
 import (
+	"context"
+
 	configv1 "github.com/openshift/api/config/v1"
 	configlistersv1 "github.com/openshift/client-go/config/listers/config/v1"
 	"github.com/openshift/library-go/pkg/operator/configobserver"
@@ -15,7 +17,7 @@ type InfrastructureLister interface {
 }
 
 // ObserveMasterURL fills in the cluster-name extended argument for the controller-manager with the cluster's infra ID
-func ObserveMasterURL(genericListers configobserver.Listers, recorder events.Recorder, existingConfig map[string]interface{}) (map[string]interface{}, []error) {
+func ObserveMasterURL(ctx context.Context, genericListers configobserver.Listers, recorder events.Recorder, existingConfig map[string]interface{}) (map[string]interface{}, []error) {
 	listers := genericListers.(InfrastructureLister)
 	errs := []error{}
 	masterURLPath := []string{"extendedArguments", "master"}
@@ -28,7 +30,7 @@ func ObserveMasterURL(genericListers configobserver.Listers, recorder events.Rec
 	}
 
 	observedConfig := map[string]interface{}{}
-	infrastructure, err := listers.InfrastructureLister().Get("cluster")
+	infrastructure, err := listers.InfrastructureLister().Get(ctx, "cluster")
 	if err != nil {
 		if errors.IsNotFound(err) {
 			recorder.Warningf("ObserveMasterURL", "Required infrastructures.%s/cluster not found", configv1.GroupName)

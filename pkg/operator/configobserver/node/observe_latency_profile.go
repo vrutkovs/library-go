@@ -1,6 +1,8 @@
 package node
 
 import (
+	"context"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/klog/v2"
@@ -26,7 +28,7 @@ type LatencyProfileRejectionScenario struct {
 	ToProfile   configv1.WorkerLatencyProfileType
 }
 
-type ShouldSuppressConfigUpdatesFunc func() (suppress bool, reason string, err error)
+type ShouldSuppressConfigUpdatesFunc func(ctx context.Context) (suppress bool, reason string, err error)
 
 type latencyProfileObserver struct {
 	latencyConfigs                   []LatencyConfigProfileTuple
@@ -48,6 +50,7 @@ func NewLatencyProfileObserver(latencyConfigs []LatencyConfigProfileTuple, shoul
 }
 
 func (l *latencyProfileObserver) observeLatencyProfile(
+	ctx context.Context,
 	genericListers configobserver.Listers,
 	eventRecorder events.Recorder,
 	existingConfig map[string]interface{},
@@ -59,7 +62,7 @@ func (l *latencyProfileObserver) observeLatencyProfile(
 	}()
 
 	listers := genericListers.(NodeLister)
-	configNode, err := listers.NodeLister().Get("cluster")
+	configNode, err := listers.NodeLister().Get(ctx, "cluster")
 	// we got an error so without the node object we are not able to determine worker latency profile
 	if err != nil {
 		// if config/v1/node/cluster object is not found, that can be treated as a non-error case
@@ -72,7 +75,7 @@ func (l *latencyProfileObserver) observeLatencyProfile(
 	}
 
 	for _, shouldSupressConfigUpdatesFn := range l.shouldSuppressConfigUpdatesFuncs {
-		suppress, reason, err := shouldSupressConfigUpdatesFn()
+		suppress, reason, err := shouldSupressConfigUpdatesFn(ctx)
 		if err != nil {
 			klog.Errorf("latency profile observer suppression error: %s", err)
 			errs = append(errs, err)

@@ -25,6 +25,8 @@ import (
 	"sync"
 	"time"
 
+	"go.opentelemetry.io/otel"
+	"golang.org/x/net/context"
 	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -577,7 +579,11 @@ func GetCA(certFile, keyFile, serialFile string) (*CA, error) {
 	}, nil
 }
 
-func GetCAFromBytes(certBytes, keyBytes []byte) (*CA, error) {
+func GetCAFromBytes(ctx context.Context, certBytes, keyBytes []byte) (*CA, error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "GetCAFromBytes")
+	defer span.End()
+
 	caConfig, err := GetTLSCertificateConfigFromBytes(certBytes, keyBytes)
 	if err != nil {
 		return nil, err

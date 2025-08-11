@@ -3,11 +3,12 @@ package configobserver
 import (
 	"context"
 	"fmt"
-	clocktesting "k8s.io/utils/clock/testing"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
+
+	clocktesting "k8s.io/utils/clock/testing"
 
 	applyoperatorv1 "github.com/openshift/client-go/operator/applyconfigurations/operator/v1"
 	"github.com/openshift/library-go/pkg/apiserver/jsonpatch"
@@ -41,7 +42,7 @@ func (c *fakeOperatorClient) GetObjectMeta() (*metav1.ObjectMeta, error) {
 	panic("not supported")
 }
 
-func (c *fakeOperatorClient) GetOperatorState() (spec *operatorv1.OperatorSpec, status *operatorv1.OperatorStatus, resourceVersion string, err error) {
+func (c *fakeOperatorClient) GetOperatorState(ctx context.Context) (spec *operatorv1.OperatorSpec, status *operatorv1.OperatorStatus, resourceVersion string, err error) {
 	if c.onUpdateSpec != nil && c.counter > 0 {
 		return c.onUpdateSpec, &operatorv1.OperatorStatus{}, "", nil
 	}
@@ -50,7 +51,7 @@ func (c *fakeOperatorClient) GetOperatorState() (spec *operatorv1.OperatorSpec, 
 }
 
 func (c *fakeOperatorClient) GetOperatorStateWithQuorum(ctx context.Context) (spec *operatorv1.OperatorSpec, status *operatorv1.OperatorStatus, resourceVersion string, err error) {
-	return c.GetOperatorState()
+	return c.GetOperatorState(ctx)
 }
 
 func (c *fakeOperatorClient) UpdateOperatorSpec(ctx context.Context, rv string, in *operatorv1.OperatorSpec) (spec *operatorv1.OperatorSpec, resourceVersion string, err error) {
@@ -135,16 +136,16 @@ func TestSyncStatus(t *testing.T) {
 				{"ObservedConfigChanged", "Writing updated observed config"},
 			},
 			observers: []ObserveConfigFunc{
-				func(listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
+				func(ctx context.Context, listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
 					return map[string]interface{}{"foo": map[string]interface{}{"one": "1"}}, nil
 				},
-				func(listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
+				func(ctx context.Context, listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
 					return map[string]interface{}{"foo": map[string]interface{}{"two": ""}}, nil
 				},
-				func(listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
+				func(ctx context.Context, listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
 					return map[string]interface{}{"bar": "two"}, nil
 				},
-				func(listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
+				func(ctx context.Context, listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
 					return map[string]interface{}{"baz": "three"}, nil
 				},
 			},
@@ -171,13 +172,13 @@ func TestSyncStatus(t *testing.T) {
 				{"ObservedConfigChanged", "Writing updated observed config"},
 			},
 			observers: []ObserveConfigFunc{
-				func(listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
+				func(ctx context.Context, listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
 					return map[string]interface{}{"foo": "one"}, nil
 				},
-				func(listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
+				func(ctx context.Context, listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
 					return map[string]interface{}{"bar": "two"}, nil
 				},
-				func(listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
+				func(ctx context.Context, listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
 					errs = append(errs, fmt.Errorf("some failure"))
 					return observedConfig, errs
 				},
@@ -208,7 +209,7 @@ func TestSyncStatus(t *testing.T) {
 				{"ObservedConfigWriteError", "Failed to write observed config: update spec failure"},
 			},
 			observers: []ObserveConfigFunc{
-				func(listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
+				func(ctx context.Context, listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
 					return map[string]interface{}{"foo": "one"}, nil
 				},
 			},
@@ -233,10 +234,10 @@ func TestSyncStatus(t *testing.T) {
 				{"ObservedConfigChanged", "Writing updated observed config"},
 			},
 			observers: []ObserveConfigFunc{
-				func(listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
+				func(ctx context.Context, listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
 					return map[string]interface{}{"level1": map[string]interface{}{"level2_c": []interface{}{"slice_entry_a"}}}, nil
 				},
-				func(listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
+				func(ctx context.Context, listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
 					return map[string]interface{}{"level1": map[string]interface{}{"level2_c": []interface{}{"slice_entry_b"}}}, nil
 				},
 			},
@@ -349,7 +350,7 @@ func TestWithPrefix(t *testing.T) {
 	}
 
 	getObserverFunc := func(shouldError, returnNil bool) ObserveConfigFunc {
-		return func(_ Listers, _ events.Recorder, existingConfig map[string]interface{}) (map[string]interface{}, []error) {
+		return func(ctx context.Context, _ Listers, _ events.Recorder, existingConfig map[string]interface{}) (map[string]interface{}, []error) {
 			var errs = []error{}
 			if shouldError {
 				errs = append(errs, testErr)
@@ -428,7 +429,7 @@ func TestWithPrefix(t *testing.T) {
 			// reset modified flag
 			defer func() { modified = false }()
 
-			gotConfig, errs := WithPrefix(tt.observer, tt.testedPrefix...)(nil, events.NewInMemoryRecorder("test", clocktesting.NewFakePassiveClock(time.Now())), tt.existingConfig)
+			gotConfig, errs := WithPrefix(tt.observer, tt.testedPrefix...)(t.Context(), nil, events.NewInMemoryRecorder("test", clocktesting.NewFakePassiveClock(time.Now())), tt.existingConfig)
 
 			if !reflect.DeepEqual(gotConfig, tt.wantConfig) {
 				t.Errorf("observed with prefix; got = %v, want %v", gotConfig, tt.wantConfig)
@@ -559,13 +560,13 @@ func TestSyncStatusWithNestedConfig(t *testing.T) {
 				{"ObservedConfigChanged", "Writing updated section (\"operandOne\") of observed config"},
 			},
 			observers: []ObserveConfigFunc{
-				WithPrefix(func(listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
+				WithPrefix(func(ctx context.Context, listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
 					return map[string]interface{}{"foo": "one"}, nil
 				}, "operandOne"),
-				WithPrefix(func(listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
+				WithPrefix(func(ctx context.Context, listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
 					return map[string]interface{}{"bar": "two"}, nil
 				}, "operandOne"),
-				WithPrefix(func(listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
+				WithPrefix(func(ctx context.Context, listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
 					return map[string]interface{}{"baz": "three"}, nil
 				}, "operandOne"),
 			},
@@ -599,13 +600,13 @@ func TestSyncStatusWithNestedConfig(t *testing.T) {
 				{"ObservedConfigChanged", "Writing updated section (\"operandOne\") of observed config"},
 			},
 			observers: []ObserveConfigFunc{
-				WithPrefix(func(listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
+				WithPrefix(func(ctx context.Context, listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
 					return map[string]interface{}{"foo": "one"}, nil
 				}, "operandOne"),
-				WithPrefix(func(listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
+				WithPrefix(func(ctx context.Context, listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
 					return map[string]interface{}{"bar": "two"}, nil
 				}, "operandOne"),
-				WithPrefix(func(listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
+				WithPrefix(func(ctx context.Context, listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
 					return map[string]interface{}{"baz": "three"}, nil
 				}, "operandOne"),
 			},
@@ -640,13 +641,13 @@ func TestSyncStatusWithNestedConfig(t *testing.T) {
 				}
 			},
 			observers: []ObserveConfigFunc{
-				WithPrefix(func(listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
+				WithPrefix(func(ctx context.Context, listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
 					return map[string]interface{}{"foo": "one"}, nil
 				}, "operandOne"),
-				WithPrefix(func(listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
+				WithPrefix(func(ctx context.Context, listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
 					return map[string]interface{}{"bar": "two"}, nil
 				}, "operandOne"),
-				WithPrefix(func(listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
+				WithPrefix(func(ctx context.Context, listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
 					return map[string]interface{}{"baz": "three"}, nil
 				}, "operandOne"),
 			},
@@ -669,13 +670,13 @@ func TestSyncStatusWithNestedConfig(t *testing.T) {
 				}
 			},
 			observers: []ObserveConfigFunc{
-				WithPrefix(func(listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
+				WithPrefix(func(ctx context.Context, listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
 					return map[string]interface{}{"foo": "one"}, nil
 				}, "operandOne"),
-				WithPrefix(func(listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
+				WithPrefix(func(ctx context.Context, listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
 					return map[string]interface{}{"bar": "two"}, nil
 				}, "operandOne"),
-				WithPrefix(func(listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
+				WithPrefix(func(ctx context.Context, listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
 					return map[string]interface{}{"baz": "three"}, nil
 				}, "operandOne"),
 			},
@@ -708,13 +709,13 @@ func TestSyncStatusWithNestedConfig(t *testing.T) {
 				}
 			},
 			observers: []ObserveConfigFunc{
-				WithPrefix(func(listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
+				WithPrefix(func(ctx context.Context, listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
 					return map[string]interface{}{"foo": "one"}, nil
 				}, "operandOne"),
-				WithPrefix(func(listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
+				WithPrefix(func(ctx context.Context, listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
 					return map[string]interface{}{"bar": "two"}, nil
 				}, "operandOne"),
-				WithPrefix(func(listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
+				WithPrefix(func(ctx context.Context, listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
 					return map[string]interface{}{"baz": "three"}, nil
 				}, "operandOne"),
 			},
@@ -755,13 +756,13 @@ func TestSyncStatusWithNestedConfig(t *testing.T) {
 				{"ObservedConfigChanged", "Writing updated section (\"operandOne\") of observed config"},
 			},
 			observers: []ObserveConfigFunc{
-				WithPrefix(func(listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
+				WithPrefix(func(ctx context.Context, listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
 					return map[string]interface{}{"foo": "one"}, nil
 				}, "operandOne"),
-				WithPrefix(func(listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
+				WithPrefix(func(ctx context.Context, listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
 					return map[string]interface{}{"bar": "two"}, nil
 				}, "operandOne"),
-				WithPrefix(func(listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
+				WithPrefix(func(ctx context.Context, listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
 					errs = append(errs, fmt.Errorf("some failure"))
 					return observedConfig, errs
 				}, "operandOne"),
@@ -802,7 +803,7 @@ func TestSyncStatusWithNestedConfig(t *testing.T) {
 				}
 			},
 			observers: []ObserveConfigFunc{
-				WithPrefix(func(listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
+				WithPrefix(func(ctx context.Context, listers Listers, recorder events.Recorder, existingConfig map[string]interface{}) (observedConfig map[string]interface{}, errs []error) {
 					return map[string]interface{}{"newFoo": "newOne"}, nil
 				}, "operandOne"),
 			},

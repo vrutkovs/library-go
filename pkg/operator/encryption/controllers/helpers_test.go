@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -21,7 +22,7 @@ func createEncryptionCfgSecret(t *testing.T, targetNs string, revision string, e
 	return s
 }
 
-var alwaysFulfilledPreconditions = func() (bool, error) { return true, nil }
+var alwaysFulfilledPreconditions = func(ctx context.Context) (bool, error) { return true, nil }
 
 type testProvider struct {
 	encryptedGRs []schema.GroupResource

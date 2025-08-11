@@ -66,7 +66,7 @@ func TestIsBootstrapComplete(t *testing.T) {
 			}
 			fakeConfigMapLister := corev1listers.NewConfigMapLister(indexer)
 
-			actualComplete, actualErr := IsBootstrapComplete(fakeConfigMapLister)
+			actualComplete, actualErr := IsBootstrapComplete(t.Context(), fakeConfigMapLister)
 
 			assert.Equal(t, test.expectComplete, actualComplete)
 			assert.Equal(t, test.expectError, actualErr)

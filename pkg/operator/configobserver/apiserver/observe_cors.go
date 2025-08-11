@@ -1,6 +1,8 @@
 package apiserver
 
 import (
+	"context"
+
 	"k8s.io/klog/v2"
 
 	"github.com/openshift/library-go/pkg/operator/configobserver"
@@ -17,17 +19,17 @@ var clusterDefaultCORSAllowedOrigins = []string{
 
 // ObserveAdditionalCORSAllowedOrigins observes the additionalCORSAllowedOrigins field
 // of the APIServer resource and sets the corsAllowedOrigins field of observedConfig
-func ObserveAdditionalCORSAllowedOrigins(genericListers configobserver.Listers, recorder events.Recorder, existingConfig map[string]interface{}) (map[string]interface{}, []error) {
-	return innerObserveAdditionalCORSAllowedOrigins(genericListers, recorder, existingConfig, []string{"corsAllowedOrigins"})
+func ObserveAdditionalCORSAllowedOrigins(ctx context.Context, genericListers configobserver.Listers, recorder events.Recorder, existingConfig map[string]interface{}) (map[string]interface{}, []error) {
+	return innerObserveAdditionalCORSAllowedOrigins(ctx, genericListers, recorder, existingConfig, []string{"corsAllowedOrigins"})
 }
 
 // ObserveAdditionalCORSAllowedOriginsToArguments observes the additionalCORSAllowedOrigins field
 // of the APIServer resource and sets the cors-allowed-origins field in observedConfig.apiServerArguments
-func ObserveAdditionalCORSAllowedOriginsToArguments(genericListers configobserver.Listers, recorder events.Recorder, existingConfig map[string]interface{}) (map[string]interface{}, []error) {
-	return innerObserveAdditionalCORSAllowedOrigins(genericListers, recorder, existingConfig, []string{"apiServerArguments", "cors-allowed-origins"})
+func ObserveAdditionalCORSAllowedOriginsToArguments(ctx context.Context, genericListers configobserver.Listers, recorder events.Recorder, existingConfig map[string]interface{}) (map[string]interface{}, []error) {
+	return innerObserveAdditionalCORSAllowedOrigins(ctx, genericListers, recorder, existingConfig, []string{"apiServerArguments", "cors-allowed-origins"})
 }
 
-func innerObserveAdditionalCORSAllowedOrigins(genericListers configobserver.Listers, recorder events.Recorder, existingConfig map[string]interface{}, corsAllowedOriginsPath []string) (ret map[string]interface{}, _ []error) {
+func innerObserveAdditionalCORSAllowedOrigins(ctx context.Context, genericListers configobserver.Listers, recorder events.Recorder, existingConfig map[string]interface{}, corsAllowedOriginsPath []string) (ret map[string]interface{}, _ []error) {
 	defer func() {
 		ret = configobserver.Pruned(ret, corsAllowedOriginsPath)
 	}()
@@ -50,7 +52,7 @@ func innerObserveAdditionalCORSAllowedOrigins(genericListers configobserver.List
 	currentCORSSet.Insert(clusterDefaultCORSAllowedOrigins...)
 
 	observedConfig := map[string]interface{}{}
-	apiServer, err := lister.APIServerLister().Get("cluster")
+	apiServer, err := lister.APIServerLister().Get(ctx, "cluster")
 	if errors.IsNotFound(err) {
 		klog.Warningf("apiserver.config.openshift.io/cluster: not found")
 		return defaultConfig, errs

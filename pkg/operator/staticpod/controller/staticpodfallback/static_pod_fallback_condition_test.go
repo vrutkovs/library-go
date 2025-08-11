@@ -1,6 +1,7 @@
 package staticpodfallback
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"testing"
@@ -121,7 +122,7 @@ func TestStaticPodFallbackConditionController(t *testing.T) {
 			}
 
 			// validate
-			_, actualOperatorStatus, _, err := fakeOperatorClient.GetOperatorState()
+			_, actualOperatorStatus, _, err := fakeOperatorClient.GetOperatorState(t.Context())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -182,8 +183,8 @@ type orderedPodNamespaceLister struct {
 	podLister corev1listers.PodNamespaceLister
 }
 
-func (s orderedPodNamespaceLister) List(selector labels.Selector) (ret []*v1.Pod, err error) {
-	pods, err := s.podLister.List(selector)
+func (s orderedPodNamespaceLister) List(ctx context.Context, selector labels.Selector) (ret []*v1.Pod, err error) {
+	pods, err := s.podLister.List(ctx, selector)
 	if err != nil {
 		return nil, err
 	}
@@ -192,8 +193,8 @@ func (s orderedPodNamespaceLister) List(selector labels.Selector) (ret []*v1.Pod
 	return pods, nil
 }
 
-func (s orderedPodNamespaceLister) Get(name string) (*v1.Pod, error) {
-	return s.podLister.Get(name)
+func (s orderedPodNamespaceLister) Get(ctx context.Context, name string) (*v1.Pod, error) {
+	return s.podLister.Get(ctx, name)
 }
 
 // is a sort.Interface that Sorts a list of Pods based on the names of the Pod

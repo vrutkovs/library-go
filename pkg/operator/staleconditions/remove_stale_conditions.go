@@ -9,6 +9,10 @@ import (
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type RemoveStaleConditionsController struct {
@@ -32,7 +36,7 @@ func NewRemoveStaleConditionsController(
 		ResyncEvery(time.Minute).
 		WithSync(c.sync).
 		WithControllerInstanceName(c.controllerInstanceName).
-		WithInformers(operatorClient.Informer()).
+		WithInformersQueueKeyFunc(v1helpers.ObjToString, operatorClient.Informer()).
 		ToController(
 			c.controllerInstanceName,
 			eventRecorder.WithComponentSuffix("remove-stale-conditions"),
@@ -40,7 +44,14 @@ func NewRemoveStaleConditionsController(
 }
 
 func (c RemoveStaleConditionsController) sync(ctx context.Context, syncContext factory.SyncContext) error {
-	_, operatorStatus, _, err := c.operatorClient.GetOperatorState()
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "ckao.RemoveStaleConditionsController", trace.WithAttributes(
+		attribute.String("controllerInstanceName", c.controllerInstanceName),
+		attribute.String("aaaQueueKey", syncContext.QueueKey()),
+	))
+	defer span.End()
+
+	_, operatorStatus, _, err := c.operatorClient.GetOperatorState(ctx)
 	if err != nil {
 		return err
 	}

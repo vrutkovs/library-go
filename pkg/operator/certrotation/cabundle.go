@@ -8,6 +8,9 @@ import (
 	"reflect"
 	"sort"
 
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -46,12 +49,20 @@ type CABundleConfigMap struct {
 }
 
 func (c CABundleConfigMap) EnsureConfigMapCABundle(ctx context.Context, signingCertKeyPair *crypto.CA, signingCertKeyPairLocation string) ([]*x509.Certificate, error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "EnsureConfigMapCABundle", trace.WithAttributes(
+		attribute.String("controllerName", c.Name),
+		attribute.String("namespace", c.Namespace),
+		attribute.String("name", c.Name),
+	))
+	defer span.End()
+
 	// by this point we have current signing cert/key pair.  We now need to make sure that the ca-bundle configmap has this cert and
 	// doesn't have any expired certs
 	updateRequired := false
 	creationRequired := false
 
-	originalCABundleConfigMap, err := c.Lister.ConfigMaps(c.Namespace).Get(c.Name)
+	originalCABundleConfigMap, err := c.Lister.ConfigMaps(c.Namespace).Get(ctx, c.Name)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, err
 	}
@@ -76,7 +87,7 @@ func (c CABundleConfigMap) EnsureConfigMapCABundle(ctx context.Context, signingC
 		updateRequired = needsOwnerUpdate || needsMetadataUpdate
 	}
 
-	updatedCerts, err := manageCABundleConfigMap(caBundleConfigMap, signingCertKeyPair.Config.Certs[0])
+	updatedCerts, err := manageCABundleConfigMap(ctx, caBundleConfigMap, signingCertKeyPair.Config.Certs[0])
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +142,14 @@ func (c CABundleConfigMap) EnsureConfigMapCABundle(ctx context.Context, signingC
 
 // manageCABundleConfigMap adds the new certificate to the list of cabundles, eliminates duplicates, and prunes the list of expired
 // certs to trust as signers
-func manageCABundleConfigMap(caBundleConfigMap *corev1.ConfigMap, currentSigner *x509.Certificate) ([]*x509.Certificate, error) {
+func manageCABundleConfigMap(ctx context.Context, caBundleConfigMap *corev1.ConfigMap, currentSigner *x509.Certificate) ([]*x509.Certificate, error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "manageCABundleConfigMap", trace.WithAttributes(
+		attribute.String("namespace", caBundleConfigMap.Namespace),
+		attribute.String("name", caBundleConfigMap.Name),
+	))
+	defer span.End()
+
 	if caBundleConfigMap.Data == nil {
 		caBundleConfigMap.Data = map[string]string{}
 	}

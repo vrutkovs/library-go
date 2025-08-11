@@ -166,8 +166,8 @@ func TestWithReplicasHook(t *testing.T) {
 				coreInformerFactory.Core().V1().Nodes().Informer().GetIndexer().Add(node)
 			}
 
-			fn := WithReplicasHook(coreInformerFactory.Core().V1().Nodes().Lister())
-			err := fn(&tc.initialOperator.Spec, tc.initialDeployment)
+			fn := WithReplicasHook(t.Context(), coreInformerFactory.Core().V1().Nodes().Lister())
+			err := fn(t.Context(), &tc.initialOperator.Spec, tc.initialDeployment)
 			if err != nil && !tc.expectError {
 				t.Errorf("Expected no error running hook function, got: %v", err)
 
@@ -218,7 +218,7 @@ func TestWithImageHook(t *testing.T) {
 	for _, tc := range testCases {
 		os.Setenv("CLI_IMAGE", tc.image)
 		fn := WithImageHook()
-		err := fn(&tc.initialOperator.Spec, tc.initialDeployment)
+		err := fn(t.Context(), &tc.initialOperator.Spec, tc.initialDeployment)
 		if err != nil && !tc.expectError {
 			t.Errorf("Expected no error running hook function, got: %v", err)
 		}

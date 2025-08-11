@@ -183,7 +183,7 @@ func TestEncryptionIntegration(tt *testing.T) {
 		}
 	}
 	conditionStatus := func(condType string) operatorv1.ConditionStatus {
-		_, status, _, err := operatorClient.GetOperatorState()
+		_, status, _, err := operatorClient.GetOperatorState(tt.Context())
 		require.NoError(t, err)
 
 		for _, c := range status.Conditions {
@@ -284,7 +284,7 @@ func TestEncryptionIntegration(tt *testing.T) {
 	setExternalReason := func(reason string) {
 		t.Helper()
 		err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-			spec, _, rv, err := operatorClient.GetOperatorState()
+			spec, _, rv, err := operatorClient.GetOperatorState(tt.Context())
 			if err != nil {
 				return err
 			}

@@ -11,6 +11,7 @@ import (
 	applyoperatorv1 "github.com/openshift/client-go/operator/applyconfigurations/operator/v1"
 	"github.com/openshift/library-go/pkg/apiserver/jsonpatch"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
+	"go.opentelemetry.io/otel"
 
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -27,6 +28,8 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 	"k8s.io/utils/ptr"
+
+	"go.opentelemetry.io/otel/trace"
 )
 
 const defaultConfigName = "cluster"
@@ -121,7 +124,7 @@ func (c dynamicOperatorClient) Informer() cache.SharedIndexInformer {
 }
 
 func (c dynamicOperatorClient) GetObjectMeta() (*metav1.ObjectMeta, error) {
-	uncastInstance, err := c.informer.Lister().Get(c.configName)
+	uncastInstance, err := c.informer.Lister().Get(context.Background(), c.configName)
 	if err != nil {
 		return nil, err
 	}
@@ -129,14 +132,18 @@ func (c dynamicOperatorClient) GetObjectMeta() (*metav1.ObjectMeta, error) {
 	return getObjectMetaFromUnstructured(instance.UnstructuredContent())
 }
 
-func (c dynamicOperatorClient) GetOperatorState() (*operatorv1.OperatorSpec, *operatorv1.OperatorStatus, string, error) {
-	uncastInstance, err := c.informer.Lister().Get(c.configName)
+func (c dynamicOperatorClient) GetOperatorState(ctx context.Context) (*operatorv1.OperatorSpec, *operatorv1.OperatorStatus, string, error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "dynamicOperatorClient.GetOperatorState", trace.WithAttributes())
+	defer span.End()
+
+	uncastInstance, err := c.informer.Lister().Get(ctx, c.configName)
 	if err != nil {
 		return nil, nil, "", err
 	}
 	instance := uncastInstance.(*unstructured.Unstructured)
 
-	return getOperatorStateFromInstance(instance)
+	return getOperatorStateFromInstance(ctx, instance)
 }
 
 func (c dynamicOperatorClient) GetOperatorStateWithQuorum(ctx context.Context) (*operatorv1.OperatorSpec, *operatorv1.OperatorStatus, string, error) {
@@ -145,15 +152,19 @@ func (c dynamicOperatorClient) GetOperatorStateWithQuorum(ctx context.Context) (
 		return nil, nil, "", err
 	}
 
-	return getOperatorStateFromInstance(instance)
+	return getOperatorStateFromInstance(ctx, instance)
 }
 
-func getOperatorStateFromInstance(instance *unstructured.Unstructured) (*operatorv1.OperatorSpec, *operatorv1.OperatorStatus, string, error) {
-	spec, err := getOperatorSpecFromUnstructured(instance.UnstructuredContent())
+func getOperatorStateFromInstance(ctx context.Context, instance *unstructured.Unstructured) (*operatorv1.OperatorSpec, *operatorv1.OperatorStatus, string, error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "dynamicOperatorClient.getOperatorStateFromInstance", trace.WithAttributes())
+	defer span.End()
+
+	spec, err := getOperatorSpecFromUnstructured(ctx, instance.UnstructuredContent())
 	if err != nil {
 		return nil, nil, "", err
 	}
-	status, err := getOperatorStatusFromUnstructured(instance.UnstructuredContent())
+	status, err := getOperatorStatusFromUnstructured(ctx, instance.UnstructuredContent())
 	if err != nil {
 		return nil, nil, "", err
 	}
@@ -165,7 +176,11 @@ func getOperatorStateFromInstance(instance *unstructured.Unstructured) (*operato
 // in operatorv1.OperatorSpec while preserving pre-existing spec fields that have
 // no correspondence in operatorv1.OperatorSpec.
 func (c dynamicOperatorClient) UpdateOperatorSpec(ctx context.Context, resourceVersion string, spec *operatorv1.OperatorSpec) (*operatorv1.OperatorSpec, string, error) {
-	uncastOriginal, err := c.informer.Lister().Get(c.configName)
+	tracer := otel.GetTracerProvider().Tracer("ckao")
+	ctx, span := tracer.Start(ctx, "dynamicOperatorClient.UpdateOperatorSpec")
+	defer span.End()
+
+	uncastOriginal, err := c.informer.Lister().Get(ctx, c.configName)
 	if err != nil {
 		return nil, "", err
 	}
@@ -181,7 +196,7 @@ func (c dynamicOperatorClient) UpdateOperatorSpec(ctx context.Context, resourceV
 	if err != nil {
 		return nil, "", err
 	}
-	retSpec, err := getOperatorSpecFromUnstructured(ret.UnstructuredContent())
+	retSpec, err := getOperatorSpecFromUnstructured(ctx, ret.UnstructuredContent())
 	if err != nil {
 		return nil, "", err
 	}
@@ -193,7 +208,11 @@ func (c dynamicOperatorClient) UpdateOperatorSpec(ctx context.Context, resourceV
 // in operatorv1.OperatorStatus while preserving pre-existing status fields that have
 // no correspondence in operatorv1.OperatorStatus.
 func (c dynamicOperatorClient) UpdateOperatorStatus(ctx context.Context, resourceVersion string, status *operatorv1.OperatorStatus) (*operatorv1.OperatorStatus, error) {
-	uncastOriginal, err := c.informer.Lister().Get(c.configName)
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "dynamicOperatorClient.UpdateOperatorStatus", trace.WithAttributes())
+	defer span.End()
+
+	uncastOriginal, err := c.informer.Lister().Get(ctx, c.configName)
 	if err != nil {
 		return nil, err
 	}
@@ -209,7 +228,7 @@ func (c dynamicOperatorClient) UpdateOperatorStatus(ctx context.Context, resourc
 	if err != nil {
 		return nil, err
 	}
-	retStatus, err := getOperatorStatusFromUnstructured(ret.UnstructuredContent())
+	retStatus, err := getOperatorStatusFromUnstructured(ctx, ret.UnstructuredContent())
 	if err != nil {
 		return nil, err
 	}
@@ -227,7 +246,11 @@ func (c dynamicOperatorClient) ApplyOperatorSpec(ctx context.Context, fieldManag
 }
 
 func (c dynamicOperatorClient) applyOperatorSpec(ctx context.Context, fieldManager string, desiredConfiguration *applyoperatorv1.StaticPodOperatorSpecApplyConfiguration) (err error) {
-	uncastOriginal, err := c.informer.Lister().Get(c.configName)
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "dynamicOperatorClient.applyOperatorSpec", trace.WithAttributes())
+	defer span.End()
+
+	uncastOriginal, err := c.informer.Lister().Get(ctx, c.configName)
 	switch {
 	case apierrors.IsNotFound(err):
 		// do nothing and proceed with the apply
@@ -271,6 +294,10 @@ func (c dynamicOperatorClient) applyOperatorSpec(ctx context.Context, fieldManag
 }
 
 func (c dynamicOperatorClient) ApplyOperatorStatus(ctx context.Context, fieldManager string, desiredConfiguration *applyoperatorv1.OperatorStatusApplyConfiguration) (err error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "dynamicOperatorClient.ApplyOperatorStatus")
+	defer span.End()
+
 	if desiredConfiguration == nil {
 		return fmt.Errorf("desiredConfiguration must have value")
 	}
@@ -280,6 +307,10 @@ func (c dynamicOperatorClient) ApplyOperatorStatus(ctx context.Context, fieldMan
 }
 
 func (c dynamicOperatorClient) applyOperatorStatus(ctx context.Context, fieldManager string, desiredConfiguration *applyoperatorv1.StaticPodOperatorStatusApplyConfiguration) (err error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "dynamicOperatorClient.applyOperatorStatus", trace.WithAttributes())
+	defer span.End()
+
 	if desiredConfiguration != nil {
 		for i, curr := range desiredConfiguration.Conditions {
 			// panicking so we can quickly find it and fix the source
@@ -292,7 +323,7 @@ func (c dynamicOperatorClient) applyOperatorStatus(ctx context.Context, fieldMan
 		}
 	}
 
-	uncastOriginal, err := c.informer.Lister().Get(c.configName)
+	uncastOriginal, err := c.informer.Lister().Get(ctx, c.configName)
 	switch {
 	case apierrors.IsNotFound(err):
 		// set last transitionTimes and then apply
@@ -384,7 +415,11 @@ func (c dynamicOperatorClient) patchOperatorStatus(ctx context.Context, jsonPatc
 }
 
 func (c dynamicOperatorClient) EnsureFinalizer(ctx context.Context, finalizer string) error {
-	uncastInstance, err := c.informer.Lister().Get(c.configName)
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "dynamicOperatorClient.EnsureFinalizer", trace.WithAttributes())
+	defer span.End()
+
+	uncastInstance, err := c.informer.Lister().Get(ctx, c.configName)
 	if err != nil {
 		return err
 	}
@@ -409,7 +444,11 @@ func (c dynamicOperatorClient) EnsureFinalizer(ctx context.Context, finalizer st
 }
 
 func (c dynamicOperatorClient) RemoveFinalizer(ctx context.Context, finalizer string) error {
-	uncastInstance, err := c.informer.Lister().Get(c.configName)
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "dynamicOperatorClient.RemoveFinalizer", trace.WithAttributes())
+	defer span.End()
+
+	uncastInstance, err := c.informer.Lister().Get(ctx, c.configName)
 	if err != nil {
 		return err
 	}
@@ -461,7 +500,10 @@ func getObjectMetaFromUnstructured(obj map[string]interface{}) (*metav1.ObjectMe
 	return ret, nil
 }
 
-func getOperatorSpecFromUnstructured(obj map[string]interface{}) (*operatorv1.OperatorSpec, error) {
+func getOperatorSpecFromUnstructured(ctx context.Context, obj map[string]interface{}) (*operatorv1.OperatorSpec, error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "dynamicOperatorClient.getOperatorSpecFromUnstructured", trace.WithAttributes())
+	defer span.End()
 	uncastSpec, exists, err := unstructured.NestedMap(obj, "spec")
 	if !exists {
 		return &operatorv1.OperatorSpec{}, nil
@@ -502,7 +544,11 @@ func setOperatorSpecFromUnstructured(obj map[string]interface{}, spec *operatorv
 	return unstructured.SetNestedMap(obj, newSpec, "spec")
 }
 
-func getOperatorStatusFromUnstructured(obj map[string]interface{}) (*operatorv1.OperatorStatus, error) {
+func getOperatorStatusFromUnstructured(ctx context.Context, obj map[string]interface{}) (*operatorv1.OperatorStatus, error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "dynamicOperatorClient.getOperatorStatusFromUnstructured", trace.WithAttributes())
+	defer span.End()
+
 	uncastStatus, exists, err := unstructured.NestedMap(obj, "status")
 	if !exists {
 		return &operatorv1.OperatorStatus{}, nil

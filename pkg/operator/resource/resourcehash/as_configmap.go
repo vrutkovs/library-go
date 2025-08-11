@@ -112,13 +112,13 @@ func MultipleObjectHashStringMapForObjectReferences(ctx context.Context, client 
 }
 
 // MultipleObjectHashStringMapForObjectReferenceFromLister is MultipleObjectHashStringMapForObjectReferences using a lister for performance
-func MultipleObjectHashStringMapForObjectReferenceFromLister(configmapLister v1.ConfigMapLister, secretLister v1.SecretLister, objRefs ...*ObjectReference) (map[string]string, error) {
+func MultipleObjectHashStringMapForObjectReferenceFromLister(ctx context.Context, configmapLister v1.ConfigMapLister, secretLister v1.SecretLister, objRefs ...*ObjectReference) (map[string]string, error) {
 	objs := []runtime.Object{}
 
 	for _, objRef := range objRefs {
 		switch objRef.Resource {
 		case schema.GroupResource{Resource: "configmap"}, schema.GroupResource{Resource: "configmaps"}:
-			obj, err := configmapLister.ConfigMaps(objRef.Namespace).Get(objRef.Name)
+			obj, err := configmapLister.ConfigMaps(objRef.Namespace).Get(ctx, objRef.Name)
 			if apierrors.IsNotFound(err) {
 				// don't error, just don't list the key. this is different than empty
 				continue
@@ -129,7 +129,7 @@ func MultipleObjectHashStringMapForObjectReferenceFromLister(configmapLister v1.
 			objs = append(objs, obj)
 
 		case schema.GroupResource{Resource: "secret"}, schema.GroupResource{Resource: "secrets"}:
-			obj, err := secretLister.Secrets(objRef.Namespace).Get(objRef.Name)
+			obj, err := secretLister.Secrets(objRef.Namespace).Get(ctx, objRef.Name)
 			if apierrors.IsNotFound(err) {
 				// don't error, just don't list the key. this is different than empty
 				continue

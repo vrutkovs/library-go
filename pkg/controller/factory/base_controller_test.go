@@ -103,7 +103,7 @@ func TestBaseController_Reconcile(t *testing.T) {
 	if err := c.reconcile(context.TODO(), NewSyncContext("TestController", eventstesting.NewTestingEventRecorder(t))); err != nil {
 		t.Fatal(err)
 	}
-	_, status, _, err := operatorClient.GetOperatorState()
+	_, status, _, err := operatorClient.GetOperatorState(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +116,7 @@ func TestBaseController_Reconcile(t *testing.T) {
 	if err := c.reconcile(context.TODO(), NewSyncContext("TestController", eventstesting.NewTestingEventRecorder(t))); err == nil {
 		t.Fatal("expected error, got none")
 	}
-	_, status, _, err = operatorClient.GetOperatorState()
+	_, status, _, err = operatorClient.GetOperatorState(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}

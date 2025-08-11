@@ -1,8 +1,10 @@
 package latencyprofilecontroller
 
 import (
+	"context"
 	"fmt"
 
+	"go.opentelemetry.io/otel"
 	listersv1 "k8s.io/client-go/listers/core/v1"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -44,7 +46,10 @@ func NewInstallerProfileRejectionChecker(
 	return ret.checkProfileRejection, nil
 }
 
-func (r *profileRejectRevisionChecker) checkProfileRejection(targetProfile configv1.WorkerLatencyProfileType, currentRevisions []int32) (isRejected bool, rejectMsg string, err error) {
+func (r *profileRejectRevisionChecker) checkProfileRejection(ctx context.Context, targetProfile configv1.WorkerLatencyProfileType, currentRevisions []int32) (isRejected bool, rejectMsg string, err error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "profileRejectRevisionChecker.checkProfileRejection")
+	defer span.End()
 	// do not reject at day-0 and support any profile
 	if nodeobserver.IsDayZero(currentRevisions) {
 		return false, "", nil
@@ -60,7 +65,7 @@ func (r *profileRejectRevisionChecker) checkProfileRejection(targetProfile confi
 	}
 
 	// get config map for the highest revision
-	configMap, err := r.configMapLister.Get(fmt.Sprintf("%s-%d", revisionConfigMapName, highestCurrentRevision))
+	configMap, err := r.configMapLister.Get(ctx, fmt.Sprintf("%s-%d", RevisionConfigMapName, highestCurrentRevision))
 	if err != nil {
 		return false, "", err
 	}

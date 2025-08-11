@@ -46,6 +46,7 @@ type APIServiceController struct {
 }
 
 func NewAPIServiceController(
+	ctx context.Context,
 	instanceName, targetNamespace string,
 	getAPIServicesToManageFunc GetAPIServicesToMangeFunc,
 	operatorClient v1helpers.OperatorClient,
@@ -59,6 +60,7 @@ func NewAPIServiceController(
 	c := &APIServiceController{
 		controllerInstanceName: factory.ControllerInstanceName(instanceName, "APIService"),
 		preconditionsForEnabledAPIServices: preconditionsForEnabledAPIServices(
+			ctx,
 			kubeInformersForNamespaces.InformersFor(targetNamespace).Core().V1().Endpoints().Lister(),
 			kubeInformersForNamespaces.InformersFor(metav1.NamespaceSystem).Core().V1().ConfigMaps().Lister(),
 		),
@@ -162,7 +164,7 @@ func (c *APIServiceController) updateOperatorStatus(
 }
 
 func (c *APIServiceController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	operatorConfigSpec, _, _, err := c.operatorClient.GetOperatorState()
+	operatorConfigSpec, _, _, err := c.operatorClient.GetOperatorState(ctx)
 	if err != nil {
 		return err
 	}
@@ -203,7 +205,7 @@ func (c *APIServiceController) syncDisabledAPIServices(ctx context.Context, apiS
 	errs := []error{}
 
 	for _, apiService := range apiServices {
-		if apiServiceObj, err := c.apiservicelister.Get(apiService.Name); err == nil {
+		if apiServiceObj, err := c.apiservicelister.Get(ctx, apiService.Name); err == nil {
 			if apiServiceObj.DeletionTimestamp != nil {
 				klog.Warningf("apiservices.apiregistration.k8s.io/%v not yet deleted", apiService.Name)
 				continue

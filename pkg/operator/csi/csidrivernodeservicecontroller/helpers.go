@@ -1,6 +1,7 @@
 package csidrivernodeservicecontroller
 
 import (
+	"context"
 	"crypto/sha256"
 	"fmt"
 	"strings"
@@ -17,7 +18,7 @@ import (
 
 // WithObservedProxyDaemonSetHook creates a hook that injects into the daemonSet's containers the observed proxy config.
 func WithObservedProxyDaemonSetHook() DaemonSetHookFunc {
-	return func(opSpec *opv1.OperatorSpec, daemonSet *appsv1.DaemonSet) error {
+	return func(ctx context.Context, opSpec *opv1.OperatorSpec, daemonSet *appsv1.DaemonSet) error {
 		containerNamesString := daemonSet.Annotations["config.openshift.io/inject-proxy"]
 		err := v1helpers.InjectObservedProxyIntoContainers(
 			&daemonSet.Spec.Template.Spec,
@@ -34,8 +35,8 @@ func WithCABundleDaemonSetHook(
 	configMapName string,
 	configMapInformer corev1.ConfigMapInformer,
 ) DaemonSetHookFunc {
-	return func(_ *opv1.OperatorSpec, daemonSet *appsv1.DaemonSet) error {
-		cm, err := configMapInformer.Lister().ConfigMaps(configMapNamespace).Get(configMapName)
+	return func(ctx context.Context, _ *opv1.OperatorSpec, daemonSet *appsv1.DaemonSet) error {
+		cm, err := configMapInformer.Lister().ConfigMaps(configMapNamespace).Get(ctx, configMapName)
 		if apierrors.IsNotFound(err) {
 			return nil
 		}
@@ -62,6 +63,7 @@ func WithCABundleDaemonSetHook(
 		// Now that the CA bundle is inject into the containers, add an annotation to the daemonSet
 		// so that it's rolled out when the ConfigMap content changes.
 		inputHashes, err := resourcehash.MultipleObjectHashStringMapForObjectReferenceFromLister(
+			ctx,
 			configMapInformer.Lister(),
 			nil,
 			resourcehash.NewObjectRef().ForConfigMap().InNamespace(configMapNamespace).Named(configMapName),
@@ -80,8 +82,9 @@ func WithConfigMapHashAnnotationHook(
 	configMapName string,
 	configMapInformer corev1.ConfigMapInformer,
 ) DaemonSetHookFunc {
-	return func(_ *opv1.OperatorSpec, ds *appsv1.DaemonSet) error {
+	return func(ctx context.Context, _ *opv1.OperatorSpec, ds *appsv1.DaemonSet) error {
 		inputHashes, err := resourcehash.MultipleObjectHashStringMapForObjectReferenceFromLister(
+			ctx,
 			configMapInformer.Lister(),
 			nil,
 			resourcehash.NewObjectRef().ForConfigMap().InNamespace(namespace).Named(configMapName),
@@ -100,8 +103,9 @@ func WithSecretHashAnnotationHook(
 	secretName string,
 	secretInformer corev1.SecretInformer,
 ) DaemonSetHookFunc {
-	return func(_ *opv1.OperatorSpec, ds *appsv1.DaemonSet) error {
+	return func(ctx context.Context, _ *opv1.OperatorSpec, ds *appsv1.DaemonSet) error {
 		inputHashes, err := resourcehash.MultipleObjectHashStringMapForObjectReferenceFromLister(
+			ctx,
 			nil,
 			secretInformer.Lister(),
 			resourcehash.NewObjectRef().ForSecret().InNamespace(namespace).Named(secretName),

@@ -8,6 +8,9 @@ import (
 	"strconv"
 	"strings"
 
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
@@ -74,7 +77,7 @@ func NewPruneController(
 	c.retrieveStatusConfigMapOwnerRefsFn = c.createStatusConfigMapOwnerRefs
 
 	return factory.New().
-		WithInformers(
+		WithInformersQueueKeyFunc(v1helpers.ObjToString,
 			operatorClient.Informer(),
 			kubeInformersForTargetNamespace.Core().V1().ConfigMaps().Informer(),
 		).
@@ -260,7 +263,14 @@ func getPrunerPodImageFromEnv() string {
 
 func (c *PruneController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
 	klog.V(5).Info("Syncing revision pruner")
-	operatorSpec, operatorStatus, _, err := c.operatorClient.GetStaticPodOperatorState()
+
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "ckao.PruneController", trace.WithAttributes(
+		attribute.String("aaaQueueKey", syncCtx.QueueKey()),
+	))
+	defer span.End()
+
+	operatorSpec, operatorStatus, _, err := c.operatorClient.GetStaticPodOperatorState(ctx)
 	if err != nil {
 		return err
 	}

@@ -89,7 +89,7 @@ func TestEncryptionEnabledPrecondition(t *testing.T) {
 
 			// act
 			target := &preconditionChecker{component: component, encryptionSecretSelector: encryptionSecretSelector, secretLister: namespacedSecretLister, apiServerConfigLister: apiServerConfigLister}
-			preconditionsReady, err := target.PreconditionFulfilled()
+			preconditionsReady, err := target.PreconditionFulfilled(t.Context())
 
 			// validate
 			if scenario.expectedPreconditionsToBeReady != preconditionsReady {

@@ -1,6 +1,7 @@
 package staticpod
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -34,6 +35,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
+
+	"go.opentelemetry.io/otel/trace"
 )
 
 type staticPodOperatorControllerBuilder struct {
@@ -45,6 +48,7 @@ type staticPodOperatorControllerBuilder struct {
 	configInformers         externalversions.SharedInformerFactory
 	clock                   clock.Clock
 	eventRecorder           events.Recorder
+	tp                      trace.TracerProvider
 
 	// resource information
 	operandNamespace        string
@@ -93,6 +97,7 @@ func NewBuilder(
 	clusterInformers informers.SharedInformerFactory,
 	configInformers externalversions.SharedInformerFactory,
 	clock clock.Clock,
+	tp trace.TracerProvider,
 ) Builder {
 	return &staticPodOperatorControllerBuilder{
 		staticPodOperatorClient: staticPodOperatorClient,
@@ -101,6 +106,7 @@ func NewBuilder(
 		kubeClusterInformers:    clusterInformers,
 		configInformers:         configInformers,
 		clock:                   clock,
+		tp:                      tp,
 	}
 }
 
@@ -111,7 +117,7 @@ type Builder interface {
 	WithOperandPodLabelSelector(labelSelector labels.Selector) Builder
 	WithRevisionedResources(operandNamespace, staticPodName string, revisionConfigMaps, revisionSecrets []revisioncontroller.RevisionResource) Builder
 	WithUnrevisionedCerts(certDir string, certConfigMaps, certSecrets []installer.UnrevisionedResource) Builder
-	WithInstaller(command []string) Builder
+	WithInstaller(ctx context.Context, command []string) Builder
 	WithMinReadyDuration(minReadyDuration time.Duration) Builder
 	WithStartupMonitor(enabledStartupMonitor func() (bool, error)) Builder
 
@@ -170,9 +176,9 @@ func (b *staticPodOperatorControllerBuilder) WithUnrevisionedCerts(certDir strin
 	return b
 }
 
-func (b *staticPodOperatorControllerBuilder) WithInstaller(command []string) Builder {
+func (b *staticPodOperatorControllerBuilder) WithInstaller(ctx context.Context, command []string) Builder {
 	b.installCommand = command
-	b.installerPodMutationFunc = func(pod *corev1.Pod, nodeName string, operatorSpec *operatorv1.StaticPodOperatorSpec, revision int32) error {
+	b.installerPodMutationFunc = func(ctx context.Context, pod *corev1.Pod, nodeName string, operatorSpec *operatorv1.StaticPodOperatorSpec, revision int32) error {
 		return nil
 	}
 	return b
@@ -278,6 +284,7 @@ func (b *staticPodOperatorControllerBuilder) ToControllers() (manager.Controller
 			configMapClient,
 			secretClient,
 			podClient,
+			operandInformers.Core().V1().Pods().Lister().Pods(b.operandNamespace),
 			eventRecorder,
 		).WithCerts(
 			b.certDir,
@@ -314,6 +321,7 @@ func (b *staticPodOperatorControllerBuilder) ToControllers() (manager.Controller
 			podClient,
 			versionRecorder,
 			eventRecorder,
+			b.tp,
 		), 1)
 	} else {
 		eventRecorder.Warning("StaticPodStateControllerMissing", "not enough information provided, not all functionality is present")

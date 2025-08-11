@@ -1,6 +1,7 @@
 package common
 
 import (
+	"context"
 	"fmt"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -20,7 +21,7 @@ func NewIsSingleNodePlatformFn(infraInformer configv1informers.InfrastructureInf
 			// Do not return transient error
 			return false, false, nil
 		}
-		infraData, err := infraInformer.Lister().Get("cluster")
+		infraData, err := infraInformer.Lister().Get(context.Background(), "cluster")
 		if err != nil {
 			return false, true, fmt.Errorf("Unable to list infrastructures.config.openshift.io/cluster object, unable to determine topology mode")
 		}

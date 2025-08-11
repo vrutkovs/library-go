@@ -1,6 +1,10 @@
 package resourcesynccontroller
 
-import "k8s.io/apimachinery/pkg/util/sets"
+import (
+	"context"
+
+	"k8s.io/apimachinery/pkg/util/sets"
+)
 
 // ResourceLocation describes coordinates for a resource to be synced
 type ResourceLocation struct {
@@ -14,9 +18,9 @@ type ResourceLocation struct {
 
 // PreconditionsFulfilled is a function that indicates whether all prerequisites
 // are met and a resource can be synced.
-type preconditionsFulfilled func() (bool, error)
+type preconditionsFulfilled func(ctx context.Context) (bool, error)
 
-func alwaysFulfilledPreconditions() (bool, error) { return true, nil }
+func alwaysFulfilledPreconditions(ctx context.Context) (bool, error) { return true, nil }
 
 type syncRuleSource struct {
 	ResourceLocation

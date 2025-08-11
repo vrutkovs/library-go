@@ -68,7 +68,7 @@ func TestConfigMatchesControllerManagerArgument(t *testing.T) {
 	for i, observedConfig := range observedConfigs {
 		configMaps[i] = createConfigMapFromObservedConfig(
 			t,
-			fmt.Sprintf("%s-%d", revisionConfigMapName, i), "some-operand-namespace",
+			fmt.Sprintf("%s-%d", RevisionConfigMapName, i), "some-operand-namespace",
 			observedConfig,
 		)
 	}

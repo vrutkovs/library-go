@@ -1,10 +1,11 @@
 package proxy
 
 import (
-	clocktesting "k8s.io/utils/clock/testing"
 	"reflect"
 	"testing"
 	"time"
+
+	clocktesting "k8s.io/utils/clock/testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
@@ -92,7 +93,7 @@ func TestObserveProxyConfig(t *testing.T) {
 
 			observeFn := NewProxyObserveFunc(configPath)
 
-			got, errorsGot := observeFn(listers, eventRecorder, initialExistingConfig)
+			got, errorsGot := observeFn(t.Context(), listers, eventRecorder, initialExistingConfig)
 			if !reflect.DeepEqual(got, tt.expected) {
 				t.Errorf("observeProxyFlags.ObserveProxyConfig() got = %v, want %v", got, tt.expected)
 			}

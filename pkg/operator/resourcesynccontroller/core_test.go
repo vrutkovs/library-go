@@ -1,6 +1,7 @@
 package resourcesynccontroller
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -24,7 +25,7 @@ type mockConfigMapLister struct {
 	configMaps map[string]map[string]*corev1.ConfigMap
 }
 
-func (m *mockConfigMapLister) List(selector labels.Selector) ([]*corev1.ConfigMap, error) {
+func (m *mockConfigMapLister) List(ctx context.Context, selector labels.Selector) ([]*corev1.ConfigMap, error) {
 	panic("not implemented")
 }
 
@@ -40,11 +41,11 @@ type mockConfigMapNamespaceLister struct {
 	configMaps map[string]map[string]*corev1.ConfigMap
 }
 
-func (m *mockConfigMapNamespaceLister) List(selector labels.Selector) ([]*corev1.ConfigMap, error) {
+func (m *mockConfigMapNamespaceLister) List(ctx context.Context, selector labels.Selector) ([]*corev1.ConfigMap, error) {
 	panic("not implemented")
 }
 
-func (m *mockConfigMapNamespaceLister) Get(name string) (*corev1.ConfigMap, error) {
+func (m *mockConfigMapNamespaceLister) Get(ctx context.Context, name string) (*corev1.ConfigMap, error) {
 	if m.configMaps == nil {
 		return nil, apierrors.NewNotFound(schema.GroupResource{Resource: "configmaps"}, name)
 	}
@@ -274,7 +275,7 @@ func TestCombineCABundleConfigMapsOptimistically(t *testing.T) {
 				configMaps: test.mockConfigMaps,
 			}
 
-			result, modified, err := CombineCABundleConfigMapsOptimistically(test.destinationConfigMap, lister, test.additionalAnnotations, test.inputLocations...)
+			result, modified, err := CombineCABundleConfigMapsOptimistically(t.Context(), test.destinationConfigMap, lister, test.additionalAnnotations, test.inputLocations...)
 
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)

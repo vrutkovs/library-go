@@ -1,6 +1,7 @@
 package encryption
 
 import (
+	"context"
 	"fmt"
 
 	configv1listers "github.com/openshift/client-go/config/listers/config/v1"
@@ -37,8 +38,8 @@ func newEncryptionEnabledPrecondition(apiServerConfigLister configv1listers.APIS
 
 // PreconditionFulfilled a method that indicates whether all prerequisites are met and we can Sync.
 // This method MUST be call after the informers synced
-func (pc *preconditionChecker) PreconditionFulfilled() (bool, error) {
-	encryptionWasEnabled, err := pc.encryptionWasEnabled()
+func (pc *preconditionChecker) PreconditionFulfilled(ctx context.Context) (bool, error) {
+	encryptionWasEnabled, err := pc.encryptionWasEnabled(ctx)
 	if err != nil {
 		return false, err // got an error, report it and run the sync loops
 	}
@@ -61,8 +62,8 @@ func (pc *preconditionChecker) PreconditionFulfilled() (bool, error) {
 //	the current encryption mode is empty or set to identity mode and
 //	a secret with encryption configuration doesn't exist in the managed namespace and
 //	secrets with encryption keys don't exist in the managed namespace
-func (pc *preconditionChecker) encryptionWasEnabled() (bool, error) {
-	apiServerConfig, err := pc.apiServerConfigLister.Get("cluster")
+func (pc *preconditionChecker) encryptionWasEnabled(ctx context.Context) (bool, error) {
+	apiServerConfig, err := pc.apiServerConfigLister.Get(ctx, "cluster")
 	if errors.IsNotFound(err) {
 		return false, nil
 	} else if err != nil {
@@ -73,7 +74,7 @@ func (pc *preconditionChecker) encryptionWasEnabled() (bool, error) {
 		return true, nil // encryption might be actually in progress
 	}
 
-	encryptionConfiguration, err := pc.secretLister.Get(fmt.Sprintf("%s-%s", encryptionconfig.EncryptionConfSecretName, pc.component))
+	encryptionConfiguration, err := pc.secretLister.Get(ctx, fmt.Sprintf("%s-%s", encryptionconfig.EncryptionConfSecretName, pc.component))
 	if err != nil && !errors.IsNotFound(err) {
 		return false, err // unknown error
 	}
@@ -84,7 +85,7 @@ func (pc *preconditionChecker) encryptionWasEnabled() (bool, error) {
 	// very unlikely - encryption config doesn't exists but we have some encryption keys
 	// but since this is coming from a cache just double check
 
-	encryptionSecrets, err := pc.secretLister.List(pc.encryptionSecretSelector)
+	encryptionSecrets, err := pc.secretLister.List(ctx, pc.encryptionSecretSelector)
 	if err != nil && !errors.IsNotFound(err) {
 		return false, err // unknown error
 	}

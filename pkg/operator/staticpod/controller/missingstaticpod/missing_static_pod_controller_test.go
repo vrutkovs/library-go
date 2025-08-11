@@ -3,10 +3,11 @@ package missingstaticpodcontroller
 import (
 	"context"
 	"fmt"
-	"k8s.io/utils/clock"
 	"strconv"
 	"testing"
 	"time"
+
+	"k8s.io/utils/clock"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -452,7 +453,7 @@ func TestGetStaticPodTerminationGracePeriodSecondsForRevision(t *testing.T) {
 				targetNamespace:                   "target-namespace",
 				operandName:                       "operand-name",
 			}
-			actualTerminationGracePeriod, err := c.getStaticPodTerminationGracePeriodSecondsForRevision(scenario.targetRevision)
+			actualTerminationGracePeriod, err := c.getStaticPodTerminationGracePeriodSecondsForRevision(t.Context(), scenario.targetRevision)
 
 			// validate
 			if err == nil && scenario.expectedError != nil {

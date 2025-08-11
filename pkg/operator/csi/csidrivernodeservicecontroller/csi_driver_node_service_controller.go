@@ -37,7 +37,7 @@ const (
 )
 
 // DaemonSetHookFunc is a hook function to modify the DaemonSet.
-type DaemonSetHookFunc func(*opv1.OperatorSpec, *appsv1.DaemonSet) error
+type DaemonSetHookFunc func(context.Context, *opv1.OperatorSpec, *appsv1.DaemonSet) error
 
 // CSIDriverNodeServiceController is a controller that deploys a CSI Node Service to a given namespace.
 //
@@ -131,7 +131,7 @@ func (c *CSIDriverNodeServiceController) Name() string {
 }
 
 func (c *CSIDriverNodeServiceController) sync(ctx context.Context, syncContext factory.SyncContext) error {
-	opSpec, opStatus, _, err := c.operatorClient.GetOperatorState()
+	opSpec, opStatus, _, err := c.operatorClient.GetOperatorState(ctx)
 	if errors.IsNotFound(err) && management.IsOperatorRemovable() {
 		return nil
 	}
@@ -165,7 +165,7 @@ func (c *CSIDriverNodeServiceController) syncManaged(ctx context.Context, opSpec
 		}
 	}
 
-	required, err := c.getDaemonSet(opSpec)
+	required, err := c.getDaemonSet(ctx, opSpec)
 	if err != nil {
 		return err
 	}
@@ -232,12 +232,12 @@ func (c *CSIDriverNodeServiceController) syncManaged(ctx context.Context, opSpec
 	)
 }
 
-func (c *CSIDriverNodeServiceController) getDaemonSet(opSpec *opv1.OperatorSpec) (*appsv1.DaemonSet, error) {
+func (c *CSIDriverNodeServiceController) getDaemonSet(ctx context.Context, opSpec *opv1.OperatorSpec) (*appsv1.DaemonSet, error) {
 	manifest := replacePlaceholders(c.manifest, opSpec)
 
 	for i, hook := range c.optionalManifestHooks {
 		var err error
-		manifest, err = hook(opSpec, manifest)
+		manifest, err = hook(ctx, opSpec, manifest)
 		if err != nil {
 			return nil, fmt.Errorf("error running manifest hook (index=%d): %w", i, err)
 		}
@@ -245,7 +245,7 @@ func (c *CSIDriverNodeServiceController) getDaemonSet(opSpec *opv1.OperatorSpec)
 	required := resourceread.ReadDaemonSetV1OrDie(manifest)
 
 	for i := range c.optionalDaemonSetHooks {
-		err := c.optionalDaemonSetHooks[i](opSpec, required)
+		err := c.optionalDaemonSetHooks[i](ctx, opSpec, required)
 		if err != nil {
 			return nil, fmt.Errorf("error running hook function (index=%d): %w", i, err)
 		}
@@ -300,7 +300,7 @@ func replacePlaceholders(manifest []byte, spec *opv1.OperatorSpec) []byte {
 
 func (c *CSIDriverNodeServiceController) syncDeleting(ctx context.Context, opSpec *opv1.OperatorSpec, opStatus *opv1.OperatorStatus, syncContext factory.SyncContext) error {
 	klog.V(4).Infof("syncDeleting")
-	required, err := c.getDaemonSet(opSpec)
+	required, err := c.getDaemonSet(ctx, opSpec)
 	if err != nil {
 		return err
 	}

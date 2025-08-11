@@ -7,6 +7,9 @@ import (
 	"time"
 
 	operatorv1 "github.com/openshift/api/operator/v1"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -19,6 +22,7 @@ import (
 	"github.com/openshift/library-go/pkg/operator/encryption/state"
 	"github.com/openshift/library-go/pkg/operator/encryption/statemachine"
 	"github.com/openshift/library-go/pkg/operator/events"
+	"github.com/openshift/library-go/pkg/operator/v1helpers"
 	operatorv1helpers "github.com/openshift/library-go/pkg/operator/v1helpers"
 )
 
@@ -59,7 +63,7 @@ func NewConditionController(
 		secretClient:             secretClient,
 	}
 
-	return factory.New().WithInformers(
+	return factory.New().WithInformersQueueKeyFunc(v1helpers.ObjToString,
 		kubeInformersForNamespaces.InformersFor("openshift-config-managed").Core().V1().Secrets().Informer(),
 		operatorClient.Informer(),
 		apiServerConfigInformer.Informer(), // do not remove, used by the precondition checker
@@ -73,7 +77,14 @@ func NewConditionController(
 		)
 }
 
-func (c *conditionController) sync(ctx context.Context, _ factory.SyncContext) (err error) {
+func (c *conditionController) sync(ctx context.Context, syncCtx factory.SyncContext) (err error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "ckao.encryption.conditionController", trace.WithAttributes(
+		attribute.String("controllerInstanceName", c.controllerInstanceName),
+		attribute.String("aaaQueueKey", syncCtx.QueueKey()),
+	))
+	defer span.End()
+
 	// Status for this condition is left out to make sure it's correctly set in every branch
 	cond := applyoperatorv1.OperatorCondition().WithType("Encrypted")
 	defer func() {
@@ -86,7 +97,7 @@ func (c *conditionController) sync(ctx context.Context, _ factory.SyncContext) (
 		}
 	}()
 
-	if ready, err := shouldRunEncryptionController(c.operatorClient, c.preconditionsFulfilledFn, c.provider.ShouldRunEncryptionControllers); err != nil || !ready {
+	if ready, err := shouldRunEncryptionController(ctx, c.operatorClient, c.preconditionsFulfilledFn, c.provider.ShouldRunEncryptionControllers); err != nil || !ready {
 		if err != nil {
 			cond = nil
 		} else {
@@ -102,7 +113,7 @@ func (c *conditionController) sync(ctx context.Context, _ factory.SyncContext) (
 		cond = nil
 		return err
 	}
-	currentState, _ := encryptionconfig.ToEncryptionState(currentConfig, foundSecrets)
+	currentState, _ := encryptionconfig.ToEncryptionState(ctx, currentConfig, foundSecrets)
 
 	cond = cond.
 		WithStatus(operatorv1.ConditionTrue).

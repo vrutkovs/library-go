@@ -1,6 +1,7 @@
 package encryptionconfig
 
 import (
+	"context"
 	"encoding/base64"
 	"sort"
 
@@ -12,6 +13,8 @@ import (
 	"github.com/openshift/library-go/pkg/operator/encryption/crypto"
 	"github.com/openshift/library-go/pkg/operator/encryption/secrets"
 	"github.com/openshift/library-go/pkg/operator/encryption/state"
+
+	"go.opentelemetry.io/otel"
 )
 
 var (
@@ -48,7 +51,11 @@ func FromEncryptionState(encryptionState map[schema.GroupResource]state.GroupRes
 //   - each resource has a distinct configuration with zero or more key based providers and the identity provider.
 //   - the last providers might be of type aesgcm. Then it carries the names of identity keys, recent first.
 //     We never use aesgcm as a real key because it is unsafe.
-func ToEncryptionState(encryptionConfig *apiserverconfigv1.EncryptionConfiguration, keySecrets []*corev1.Secret) (map[schema.GroupResource]state.GroupResourceState, []state.KeyState) {
+func ToEncryptionState(ctx context.Context, encryptionConfig *apiserverconfigv1.EncryptionConfiguration, keySecrets []*corev1.Secret) (map[schema.GroupResource]state.GroupResourceState, []state.KeyState) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "encryption.GetEncryptionConfigAndState")
+	defer span.End()
+
 	backedKeys := make([]state.KeyState, 0, len(keySecrets))
 	for _, s := range keySecrets {
 		km, err := secrets.ToKeyState(s)

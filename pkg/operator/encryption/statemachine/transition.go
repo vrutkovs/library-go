@@ -15,6 +15,8 @@ import (
 	"github.com/openshift/library-go/pkg/operator/encryption/encryptionconfig"
 	"github.com/openshift/library-go/pkg/operator/encryption/secrets"
 	"github.com/openshift/library-go/pkg/operator/encryption/state"
+
+	"go.opentelemetry.io/otel"
 )
 
 // Deployer abstracts the deployment mechanism like the static pod controllers.
@@ -36,6 +38,10 @@ func GetEncryptionConfigAndState(
 	encryptionSecretSelector metav1.ListOptions,
 	encryptedGRs []schema.GroupResource,
 ) (current *apiserverconfigv1.EncryptionConfiguration, desired map[schema.GroupResource]state.GroupResourceState, encryptionSecrets []*corev1.Secret, transitioningReason string, err error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "encryption.GetEncryptionConfigAndState")
+	defer span.End()
+
 	// get current config
 	encryptionConfigSecret, converged, err := deployer.DeployedEncryptionConfigSecret(ctx)
 	if err != nil {
@@ -57,7 +63,7 @@ func GetEncryptionConfigAndState(
 	if err != nil {
 		return nil, nil, nil, "", err
 	}
-	desiredEncryptionState := getDesiredEncryptionState(encryptionConfig, encryptionSecrets, encryptedGRs)
+	desiredEncryptionState := getDesiredEncryptionState(ctx, encryptionConfig, encryptionSecrets, encryptedGRs)
 
 	return encryptionConfig, desiredEncryptionState, encryptionSecrets, "", nil
 }
@@ -74,11 +80,11 @@ func GetEncryptionConfigAndState(
 // 2. every GR must have all the read-keys (existing as secrets) since last complete migration.
 // 3. if (2) is the case, the write-key must be the most recent key.
 // 4. if (2) and (3) are the case, all non-write keys should be removed.
-func getDesiredEncryptionState(oldEncryptionConfig *apiserverconfigv1.EncryptionConfiguration, encryptionSecrets []*corev1.Secret, toBeEncryptedGRs []schema.GroupResource) map[schema.GroupResource]state.GroupResourceState {
+func getDesiredEncryptionState(ctx context.Context, oldEncryptionConfig *apiserverconfigv1.EncryptionConfiguration, encryptionSecrets []*corev1.Secret, toBeEncryptedGRs []schema.GroupResource) map[schema.GroupResource]state.GroupResourceState {
 	//
 	// STEP 0: start with old encryption config, and alter it towards the desired state in the following STEPs.
 	//
-	desiredEncryptionState, backedKeys := encryptionconfig.ToEncryptionState(oldEncryptionConfig, encryptionSecrets)
+	desiredEncryptionState, backedKeys := encryptionconfig.ToEncryptionState(ctx, oldEncryptionConfig, encryptionSecrets)
 	if desiredEncryptionState == nil {
 		desiredEncryptionState = make(map[schema.GroupResource]state.GroupResourceState, len(toBeEncryptedGRs))
 	}

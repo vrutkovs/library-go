@@ -150,7 +150,7 @@ func TestSync(t *testing.T) {
 			err := controller.Sync(context.TODO(), factory.NewSyncContext("test", recorder))
 
 			// Assert
-			_, status, _, _ := operatorClient.GetOperatorState()
+			_, status, _, _ := operatorClient.GetOperatorState(t.Context())
 
 			if tc.expectedFailingStatus && err == nil {
 				t.Fatalf("expected failed sync")
@@ -565,7 +565,7 @@ func TestShouldSync(t *testing.T) {
 			}()
 
 			// Act
-			shouldSync, err := shouldSync(cloudCredentialInformer.Operator().V1().CloudCredentials().Lister(), tc.credentialsRequest)
+			shouldSync, err := shouldSync(t.Context(), cloudCredentialInformer.Operator().V1().CloudCredentials().Lister(), tc.credentialsRequest)
 
 			// Assert
 			if tc.expectedError && err == nil {

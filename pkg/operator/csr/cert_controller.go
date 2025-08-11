@@ -168,7 +168,7 @@ func (c *clientCertificateController) sync(ctx context.Context, syncCtx factory.
 
 	// reconcile pending csr if exists
 	if len(c.csrName) > 0 {
-		newSecretConfig, leaf, err := c.syncCSR(secret)
+		newSecretConfig, leaf, err := c.syncCSR(ctx, secret)
 		if err != nil {
 			c.reset()
 			return err
@@ -239,14 +239,14 @@ func (c *clientCertificateController) sync(ctx context.Context, syncCtx factory.
 	return nil
 }
 
-func (c *clientCertificateController) syncCSR(secret *corev1.Secret) (map[string][]byte, *x509.Certificate, error) {
+func (c *clientCertificateController) syncCSR(ctx context.Context, secret *corev1.Secret) (map[string][]byte, *x509.Certificate, error) {
 	// skip if there is no ongoing csr
 	if len(c.csrName) == 0 {
 		return nil, nil, fmt.Errorf("no ongoing csr")
 	}
 
 	// skip if csr no longer exists
-	csr, err := c.hubCSRLister.Get(c.csrName)
+	csr, err := c.hubCSRLister.Get(ctx, c.csrName)
 	switch {
 	case errors.IsNotFound(err):
 		// fallback to fetching csr from hub apiserver in case it is not cached by informer yet

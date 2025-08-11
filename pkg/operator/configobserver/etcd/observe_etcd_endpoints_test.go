@@ -1,12 +1,14 @@
 package etcd
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
-	clocktesting "k8s.io/utils/clock/testing"
 	"reflect"
 	"testing"
 	"time"
+
+	clocktesting "k8s.io/utils/clock/testing"
 
 	"github.com/openshift/library-go/pkg/operator/configobserver"
 	"github.com/openshift/library-go/pkg/operator/events"
@@ -57,10 +59,10 @@ func TestObserveStorageURLsAndObserveStorageURLsToArguments(t *testing.T) {
 				expected := map[string]interface{}{}
 				errs := []error{}
 				if useAPIServerArguments {
-					actual, errs = ObserveStorageURLsToArguments(listers, events.NewInMemoryRecorder("test", clocktesting.NewFakePassiveClock(time.Now())), tt.currentConfigFor("apiServerArguments", "etcd-servers"))
+					actual, errs = ObserveStorageURLsToArguments(t.Context(), listers, events.NewInMemoryRecorder("test", clocktesting.NewFakePassiveClock(time.Now())), tt.currentConfigFor("apiServerArguments", "etcd-servers"))
 					expected = tt.expectedConfigFor("apiServerArguments", "etcd-servers")
 				} else {
-					actual, errs = ObserveStorageURLs(listers, events.NewInMemoryRecorder("test", clocktesting.NewFakePassiveClock(time.Now())), tt.currentConfigFor("storageConfig", "urls"))
+					actual, errs = ObserveStorageURLs(t.Context(), listers, events.NewInMemoryRecorder("test", clocktesting.NewFakePassiveClock(time.Now())), tt.currentConfigFor("storageConfig", "urls"))
 					expected = tt.expectedConfigFor("storageConfig", "urls")
 				}
 				if tt.expectErrors && len(errs) == 0 {
@@ -210,7 +212,7 @@ func TestInnerObserveStorageURLs(t *testing.T) {
 			if tt.fallbackFor == nil {
 				tt.fallbackFor = fallbackFor(nil)
 			}
-			actual, errs := innerObserveStorageURLs(tt.fallbackFor(storageConfigURLsPath...), false, listers, events.NewInMemoryRecorder("test", clocktesting.NewFakePassiveClock(time.Now())), tt.currentConfigFor(storageConfigURLsPath...), storageConfigURLsPath)
+			actual, errs := innerObserveStorageURLs(t.Context(), tt.fallbackFor(storageConfigURLsPath...), false, listers, events.NewInMemoryRecorder("test", clocktesting.NewFakePassiveClock(time.Now())), tt.currentConfigFor(storageConfigURLsPath...), storageConfigURLsPath)
 			if tt.expectErrors && len(errs) == 0 {
 				t.Errorf("errors expectedConfigFor")
 			}
@@ -342,7 +344,7 @@ func TestObserveStorageURLsFromOldEndPoint(t *testing.T) {
 				}
 			}
 			storageConfigURLsPath := []string{"storageConfig", "urls"}
-			actual, errs := innerObserveStorageURLsFromOldEndPoint(lister, events.NewInMemoryRecorder("test", clocktesting.NewFakePassiveClock(time.Now())), tt.currentConfigFor(storageConfigURLsPath...), storageConfigURLsPath)
+			actual, errs := innerObserveStorageURLsFromOldEndPoint(t.Context(), lister, events.NewInMemoryRecorder("test", clocktesting.NewFakePassiveClock(time.Now())), tt.currentConfigFor(storageConfigURLsPath...), storageConfigURLsPath)
 			if tt.expectErrors && len(errs) == 0 {
 				t.Errorf("errors expectedConfigFor")
 			}
@@ -413,7 +415,7 @@ func withAddress(ip string) func(*v1.ConfigMap) {
 
 func fallbackFor(observedFn func(...string) map[string]interface{}, errs ...error) func(...string) fallBackObserverFn {
 	return func(fields ...string) fallBackObserverFn {
-		return func(genericListers configobserver.Listers, recorder events.Recorder, currentConfig map[string]interface{}, storageConfigURLsPath []string) (map[string]interface{}, []error) {
+		return func(ctx context.Context, genericListers configobserver.Listers, recorder events.Recorder, currentConfig map[string]interface{}, storageConfigURLsPath []string) (map[string]interface{}, []error) {
 			return observedFn(fields...), errs
 		}
 	}

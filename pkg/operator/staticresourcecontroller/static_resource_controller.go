@@ -40,6 +40,10 @@ import (
 	"github.com/openshift/library-go/pkg/operator/management"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 var (
@@ -116,7 +120,7 @@ func NewStaticResourceController(
 
 		eventRecorder: eventRecorder.WithComponentSuffix(strings.ToLower(instanceName)),
 
-		factory:          factory.New().WithInformers(operatorClient.Informer()).ResyncEvery(1 * time.Minute),
+		factory:          factory.New().WithInformersQueueKeyFunc(v1helpers.ObjToString, operatorClient.Informer()).ResyncEvery(1 * time.Minute),
 		performanceCache: resourceapply.NewResourceCache(),
 	}
 	c.WithConditionalResources(manifests, files, nil, nil)
@@ -265,7 +269,7 @@ func (c *StaticResourceController) AddKubeInformers(kubeInformersByNamespace v1h
 }
 
 func (c *StaticResourceController) AddInformer(informer cache.SharedIndexInformer) *StaticResourceController {
-	c.factory.WithInformers(informer)
+	c.factory.WithInformersQueueKeyFunc(v1helpers.ObjToString, informer)
 	return c
 }
 
@@ -285,11 +289,19 @@ func (c *StaticResourceController) AddNamespaceInformer(informer cache.SharedInd
 }
 
 func (c *StaticResourceController) Sync(ctx context.Context, syncContext factory.SyncContext) error {
-	operatorSpec, _, _, err := c.operatorClient.GetOperatorState()
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "ckao.StaticResourceController", trace.WithAttributes(
+		attribute.String("controllerInstanceName", c.controllerInstanceName),
+		attribute.String("operandName", c.instanceName),
+		attribute.String("aaaQueueKey", syncContext.QueueKey()),
+	))
+	defer span.End()
+
+	operatorSpec, _, _, err := c.operatorClient.GetOperatorState(ctx)
 	if err != nil {
 		return err
 	}
-	if !management.IsOperatorManaged(operatorSpec.ManagementState) && (operatorSpec.ManagementState != operatorv1.Removed || management.IsOperatorNotRemovable()) {
+	if !management.IsOperatorManaged(ctx, operatorSpec.ManagementState) && (operatorSpec.ManagementState != operatorv1.Removed || management.IsOperatorNotRemovable()) {
 		return nil
 	}
 

@@ -47,7 +47,7 @@ func NewOperatorManagementStateController(
 }
 
 func (c ManagementStateController) sync(ctx context.Context, syncContext factory.SyncContext) error {
-	detailedSpec, _, _, err := c.operatorClient.GetOperatorState()
+	detailedSpec, _, _, err := c.operatorClient.GetOperatorState(ctx)
 	if apierrors.IsNotFound(err) {
 		if management.IsOperatorRemovable() {
 			return nil

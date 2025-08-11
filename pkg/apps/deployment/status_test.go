@@ -1,6 +1,7 @@
 package deployment
 
 import (
+	"context"
 	"errors"
 	"reflect"
 	"strings"
@@ -39,7 +40,7 @@ type fakePodLister struct {
 	pods []*corev1.Pod
 }
 
-func (f *fakePodLister) List(selector labels.Selector) ([]*corev1.Pod, error) {
+func (f *fakePodLister) List(ctx context.Context, selector labels.Selector) ([]*corev1.Pod, error) {
 	panic("implement me")
 }
 
@@ -53,11 +54,11 @@ type fakePodNamespacer struct {
 	pods []*corev1.Pod
 }
 
-func (f *fakePodNamespacer) List(selector labels.Selector) ([]*corev1.Pod, error) {
+func (f *fakePodNamespacer) List(ctx context.Context, selector labels.Selector) ([]*corev1.Pod, error) {
 	return f.pods, nil
 }
 
-func (f *fakePodNamespacer) Get(name string) (*corev1.Pod, error) {
+func (f *fakePodNamespacer) Get(ctx context.Context, name string) (*corev1.Pod, error) {
 	panic("implement me")
 }
 
@@ -208,7 +209,7 @@ func TestPodContainersStatus(t *testing.T) {
 			podLister := &fakePodLister{
 				pods: test.pods,
 			}
-			messages, err := PodContainersStatus(test.deployment, podLister)
+			messages, err := PodContainersStatus(t.Context(), test.deployment, podLister)
 			if test.expectedError != nil && !errors.Is(err, test.expectedError) {
 				t.Fatalf("expected error %v, got %v", test.expectedError, err)
 			}

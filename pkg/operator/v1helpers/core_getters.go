@@ -43,23 +43,23 @@ func (g combinedConfigMapGetter) ConfigMaps(namespace string) corev1client.Confi
 	}
 }
 
-func (g combinedConfigMapInterface) Get(_ context.Context, name string, options metav1.GetOptions) (*corev1.ConfigMap, error) {
+func (g combinedConfigMapInterface) Get(ctx context.Context, name string, options metav1.GetOptions) (*corev1.ConfigMap, error) {
 	if !equality.Semantic.DeepEqual(options, emptyGetOptions) {
 		return nil, fmt.Errorf("GetOptions are not honored by cached client: %#v", options)
 	}
 
-	ret, err := g.lister.Get(name)
+	ret, err := g.lister.Get(ctx, name)
 	if err != nil {
 		return nil, err
 	}
 	return ret.DeepCopy(), nil
 }
-func (g combinedConfigMapInterface) List(_ context.Context, options metav1.ListOptions) (*corev1.ConfigMapList, error) {
+func (g combinedConfigMapInterface) List(ctx context.Context, options metav1.ListOptions) (*corev1.ConfigMapList, error) {
 	if !equality.Semantic.DeepEqual(options, emptyListOptions) {
 		return nil, fmt.Errorf("ListOptions are not honored by cached client: %#v", options)
 	}
 
-	list, err := g.lister.List(labels.Everything())
+	list, err := g.lister.List(ctx, labels.Everything())
 	if err != nil {
 		return nil, err
 	}
@@ -97,24 +97,24 @@ func (g combinedSecretGetter) Secrets(namespace string) corev1client.SecretInter
 	}
 }
 
-func (g combinedSecretInterface) Get(_ context.Context, name string, options metav1.GetOptions) (*corev1.Secret, error) {
+func (g combinedSecretInterface) Get(ctx context.Context, name string, options metav1.GetOptions) (*corev1.Secret, error) {
 	if !equality.Semantic.DeepEqual(options, emptyGetOptions) {
 		return nil, fmt.Errorf("GetOptions are not honored by cached client: %#v", options)
 	}
 
-	ret, err := g.lister.Get(name)
+	ret, err := g.lister.Get(ctx, name)
 	if err != nil {
 		return nil, err
 	}
 	return ret.DeepCopy(), nil
 }
 
-func (g combinedSecretInterface) List(_ context.Context, options metav1.ListOptions) (*corev1.SecretList, error) {
+func (g combinedSecretInterface) List(ctx context.Context, options metav1.ListOptions) (*corev1.SecretList, error) {
 	if !equality.Semantic.DeepEqual(options, emptyListOptions) {
 		return nil, fmt.Errorf("ListOptions are not honored by cached client: %#v", options)
 	}
 
-	list, err := g.lister.List(labels.Everything())
+	list, err := g.lister.List(ctx, labels.Everything())
 	if err != nil {
 		return nil, err
 	}

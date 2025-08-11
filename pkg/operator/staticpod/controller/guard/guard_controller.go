@@ -10,11 +10,13 @@ import (
 	"strconv"
 	"strings"
 
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -26,11 +28,18 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
+	"github.com/openshift/library-go/pkg/operator/v1helpers"
 	operatorv1helpers "github.com/openshift/library-go/pkg/operator/v1helpers"
+)
+
+const (
+	guardLabelsKey   = "app"
+	guardLabelsValue = "guard"
 )
 
 // GuardController is a controller that watches amount of static pods on master nodes and
@@ -113,7 +122,22 @@ func NewGuardController(
 	c.masterNodesSelector = masterNodesSelector
 
 	return factory.New().
-		WithInformers(
+		WithFilteredEventsInformersQueueKeyFunc(v1helpers.ObjToString,
+			func(obj interface{}) bool {
+				if pod, ok := obj.(*corev1.Pod); ok {
+					if pod.Namespace != targetNamespace {
+						return false
+					}
+					if pod.Labels[guardLabelsKey] == guardLabelsValue {
+						return true
+					}
+					if operandPodLabelSelector.Matches(labels.Set(pod.Labels)) {
+						return true
+					}
+					return false
+				}
+				return true
+			},
 			kubeInformersForTargetNamespace.Core().V1().Pods().Informer(),
 			kubeInformersClusterScoped.Core().V1().Nodes().Informer(),
 		).
@@ -181,6 +205,12 @@ var podTemplate []byte
 func (c *GuardController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
 	klog.V(5).Info("Syncing guards")
 
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "ckao.GuardController", trace.WithAttributes(
+		attribute.String("aaaQueueKey", syncCtx.QueueKey()),
+	))
+	defer span.End()
+
 	if c.createConditionalFunc == nil {
 		return fmt.Errorf("createConditionalFunc not set")
 	}
@@ -203,7 +233,7 @@ func (c *GuardController) sync(ctx context.Context, syncCtx factory.SyncContext)
 
 		// List the pdb from the cache in case it does not exist and there's nothing to delete
 		// so no Delete request is executed.
-		pdbs, err := c.pdbLister.PodDisruptionBudgets(c.targetNamespace).List(labels.Everything())
+		pdbs, err := c.pdbLister.PodDisruptionBudgets(c.targetNamespace).List(ctx, labels.Everything())
 		if err != nil {
 			klog.Errorf("Unable to list PodDisruptionBudgets: %v", err)
 			return err
@@ -220,7 +250,7 @@ func (c *GuardController) sync(ctx context.Context, syncCtx factory.SyncContext)
 			}
 		}
 
-		pods, err := c.podLister.Pods(c.targetNamespace).List(labels.SelectorFromSet(labels.Set{"app": "guard"}))
+		pods, err := c.podLister.Pods(c.targetNamespace).List(ctx, labels.SelectorFromSet(labels.Set{guardLabelsKey: guardLabelsValue}))
 		if err != nil {
 			errs = append(errs, err)
 		} else {
@@ -233,7 +263,7 @@ func (c *GuardController) sync(ctx context.Context, syncCtx factory.SyncContext)
 			}
 		}
 	} else {
-		nodes, err := c.nodeLister.List(c.masterNodesSelector)
+		nodes, err := c.nodeLister.List(ctx, c.masterNodesSelector)
 		if err != nil {
 			return err
 		}
@@ -242,14 +272,14 @@ func (c *GuardController) sync(ctx context.Context, syncCtx factory.SyncContext)
 		// selectors as well as selectors that want to OR with master nodes.
 		// see: https://github.com/kubernetes/kubernetes/issues/90549#issuecomment-620625847
 		if c.extraNodeSelector != nil {
-			extraNodes, err := c.nodeLister.List(c.extraNodeSelector)
+			extraNodes, err := c.nodeLister.List(ctx, c.extraNodeSelector)
 			if err != nil {
 				return err
 			}
 			nodes = append(nodes, extraNodes...)
 		}
 
-		pods, err := c.podLister.Pods(c.targetNamespace).List(c.operandPodLabelSelector)
+		pods, err := c.podLister.Pods(c.targetNamespace).List(ctx, c.operandPodLabelSelector)
 		if err != nil {
 			return err
 		}
@@ -265,7 +295,7 @@ func (c *GuardController) sync(ctx context.Context, syncCtx factory.SyncContext)
 			pdb.Spec.MinAvailable = &minAvailable
 		}
 
-		pdbObj, err := c.pdbLister.PodDisruptionBudgets(pdb.Namespace).Get(pdb.Name)
+		pdbObj, err := c.pdbLister.PodDisruptionBudgets(pdb.Namespace).Get(ctx, pdb.Name)
 		if err == nil {
 			if !ptr.Equal(pdbObj.Spec.UnhealthyPodEvictionPolicy, pdb.Spec.UnhealthyPodEvictionPolicy) ||
 				!ptr.Equal(pdbObj.Spec.MinAvailable, pdb.Spec.MinAvailable) {
@@ -336,7 +366,7 @@ func (c *GuardController) sync(ctx context.Context, syncCtx factory.SyncContext)
 			pod.Spec.Containers[0].ReadinessProbe.HTTPGet.Port = intstr.FromInt(readyzPort)
 			pod.Spec.Containers[0].ReadinessProbe.HTTPGet.Path = c.readyzEndpoint
 
-			actual, err := c.podGetter.Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+			actual, err := c.podLister.Pods(pod.Namespace).Get(ctx, pod.Name)
 			if err == nil {
 				// Delete the pod so it can be re-created. ApplyPod only updates the metadata part of the manifests, ignores the rest
 				delete := false
@@ -377,10 +407,13 @@ func (c *GuardController) sync(ctx context.Context, syncCtx factory.SyncContext)
 				continue
 			}
 
-			_, _, err = resourceapply.ApplyPod(ctx, c.podGetter, syncCtx.Recorder(), pod)
-			if err != nil {
-				klog.Errorf("Unable to apply pod %v changes: %v", pod.Name, err)
-				errs = append(errs, fmt.Errorf("Unable to apply pod %v changes: %v", pod.Name, err))
+			if diff := cmp.Diff(actual, pod); diff != "" {
+				span.AddEvent(fmt.Sprintf("Diff: %s", diff))
+				_, _, err = resourceapply.ApplyPod(ctx, c.podGetter, syncCtx.Recorder(), pod)
+				if err != nil {
+					klog.Errorf("Unable to apply pod %v changes: %v", pod.Name, err)
+					errs = append(errs, fmt.Errorf("Unable to apply pod %v changes: %v", pod.Name, err))
+				}
 			}
 		}
 	}

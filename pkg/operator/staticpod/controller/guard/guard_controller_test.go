@@ -49,12 +49,12 @@ type FakeInfrastructureLister struct {
 	InfrastructureLister_ configlistersv1.InfrastructureLister
 }
 
-func (l FakeInfrastructureLister) Get(name string) (*configv1.Infrastructure, error) {
-	return l.InfrastructureLister_.Get(name)
+func (l FakeInfrastructureLister) Get(ctx context.Context, name string) (*configv1.Infrastructure, error) {
+	return l.InfrastructureLister_.Get(ctx, name)
 }
 
-func (l FakeInfrastructureLister) List(selector labels.Selector) (ret []*configv1.Infrastructure, err error) {
-	return l.InfrastructureLister_.List(selector)
+func (l FakeInfrastructureLister) List(ctx context.Context, selector labels.Selector) (ret []*configv1.Infrastructure, err error) {
+	return l.InfrastructureLister_.List(ctx, selector)
 }
 
 type FakeInfrastructureSharedInformer struct {

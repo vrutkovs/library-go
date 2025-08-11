@@ -3,11 +3,12 @@ package revisioncontroller
 import (
 	"context"
 	"fmt"
-	clocktesting "k8s.io/utils/clock/testing"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
+
+	clocktesting "k8s.io/utils/clock/testing"
 
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
@@ -544,7 +545,7 @@ func TestRevisionController(t *testing.T) {
 			)
 			syncErr := c.Sync(context.TODO(), factory.NewSyncContext("RevisionController", eventRecorder))
 			if tc.validateStatus != nil {
-				_, status, _, _ := tc.staticPodOperatorClient.GetStaticPodOperatorState()
+				_, status, _, _ := tc.staticPodOperatorClient.GetStaticPodOperatorState(t.Context())
 				tc.validateStatus(t, status)
 			}
 			if tc.validateActions != nil {
@@ -631,7 +632,7 @@ func TestRevisionControllerRevisionCreatedFailedStatusUpdate(t *testing.T) {
 		t.Errorf("expected error after running NewRevisionController.Sync, got nil")
 		return
 	}
-	_, status, _, statusErr := staticPodOperatorClient.GetStaticPodOperatorState()
+	_, status, _, statusErr := staticPodOperatorClient.GetStaticPodOperatorState(t.Context())
 	if statusErr != nil {
 		t.Errorf("unexpected status err: %v", statusErr)
 		return
@@ -650,7 +651,7 @@ func TestRevisionControllerRevisionCreatedFailedStatusUpdate(t *testing.T) {
 		t.Errorf("unexpected error after running NewRevisionController.Sync: %v", syncErr)
 		return
 	}
-	_, status, _, statusErr = staticPodOperatorClient.GetStaticPodOperatorState()
+	_, status, _, statusErr = staticPodOperatorClient.GetStaticPodOperatorState(t.Context())
 	if statusErr != nil {
 		t.Errorf("unexpected status err: %v", statusErr)
 		return
@@ -820,7 +821,7 @@ func TestSyncWithRevisionPrecondition(t *testing.T) {
 			syncErr := c.Sync(context.TODO(), factory.NewSyncContext("RevisionController", eventRecorder))
 			require.Equal(t, syncErr, tc.expSyncErr)
 
-			_, status, _, _ := tc.staticPodOperatorClient.GetStaticPodOperatorState()
+			_, status, _, _ := tc.staticPodOperatorClient.GetStaticPodOperatorState(t.Context())
 			require.Equal(t, tc.expUpdatedLatestAvailableRevision, status.LatestAvailableRevision)
 
 		})

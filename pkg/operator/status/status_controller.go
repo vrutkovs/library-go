@@ -22,7 +22,12 @@ import (
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/management"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
+	"github.com/openshift/library-go/pkg/operator/v1helpers"
 	operatorv1helpers "github.com/openshift/library-go/pkg/operator/v1helpers"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type VersionGetter interface {
@@ -81,7 +86,7 @@ func NewClusterOperatorStatusController(
 		clusterOperatorLister: clusterOperatorInformer.Lister(),
 		operatorClient:        operatorClient,
 		degradedInertia:       MustNewInertia(2 * time.Minute).Inertia,
-		controllerFactory: factory.New().ResyncEvery(time.Minute).WithInformers(
+		controllerFactory: factory.New().ResyncEvery(time.Minute).WithInformersQueueKeyFunc(v1helpers.ObjToString,
 			operatorClient.Informer(),
 			clusterOperatorInformer.Informer(),
 		),
@@ -134,7 +139,15 @@ func (c *StatusSyncer) WithVersionRemoval() *StatusSyncer {
 // sync reacts to a change in prereqs by finding information that is required to match another value in the cluster. This
 // must be information that is logically "owned" by another component.
 func (c StatusSyncer) Sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	detailedSpec, currentDetailedStatus, _, err := c.operatorClient.GetOperatorState()
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "ckao.StatusSyncer", trace.WithAttributes(
+		attribute.String("clusterOperatorName", c.clusterOperatorName),
+		attribute.String("controllerName", c.Name()),
+		attribute.String("aaaQueueKey", syncCtx.QueueKey()),
+	))
+	defer span.End()
+
+	detailedSpec, currentDetailedStatus, _, err := c.operatorClient.GetOperatorState(ctx)
 	if apierrors.IsNotFound(err) {
 		syncCtx.Recorder().Warningf("StatusNotFound", "Unable to determine current operator status for clusteroperator/%s", c.clusterOperatorName)
 		if err := c.clusterOperatorClient.ClusterOperators().Delete(ctx, c.clusterOperatorName, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
@@ -146,7 +159,7 @@ func (c StatusSyncer) Sync(ctx context.Context, syncCtx factory.SyncContext) err
 		return err
 	}
 
-	originalClusterOperatorObj, err := c.clusterOperatorLister.Get(c.clusterOperatorName)
+	originalClusterOperatorObj, err := c.clusterOperatorLister.Get(ctx, c.clusterOperatorName)
 	if err != nil && !apierrors.IsNotFound(err) {
 		syncCtx.Recorder().Warningf("StatusFailed", "Unable to get current operator status for clusteroperator/%s: %v", c.clusterOperatorName, err)
 		return err
@@ -221,7 +234,7 @@ func (c StatusSyncer) Sync(ctx context.Context, syncCtx factory.SyncContext) err
 	configv1helpers.SetStatusCondition(&clusterOperatorObj.Status.Conditions, UnionClusterCondition(configv1.OperatorUpgradeable, operatorv1.ConditionTrue, nil, currentDetailedStatus.Conditions...), c.clock)
 	configv1helpers.SetStatusCondition(&clusterOperatorObj.Status.Conditions, UnionClusterCondition(configv1.EvaluationConditionsDetected, operatorv1.ConditionFalse, nil, currentDetailedStatus.Conditions...), c.clock)
 
-	c.syncStatusVersions(clusterOperatorObj, syncCtx)
+	c.syncStatusVersions(ctx, clusterOperatorObj, syncCtx)
 
 	// if we have no diff, just return
 	if equality.Semantic.DeepEqual(clusterOperatorObj, originalClusterOperatorObj) {
@@ -249,7 +262,11 @@ func skipOperatorStatusChangedEvent(originalStatus, newStatus configv1.ClusterOp
 	return len(configv1helpers.GetStatusDiff(originalCopy, newStatus)) == 0
 }
 
-func (c *StatusSyncer) syncStatusVersions(clusterOperatorObj *configv1.ClusterOperator, syncCtx factory.SyncContext) {
+func (c *StatusSyncer) syncStatusVersions(ctx context.Context, clusterOperatorObj *configv1.ClusterOperator, syncCtx factory.SyncContext) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "statusSyncer.syncStatusVersions")
+	defer span.End()
+
 	versions := c.versionGetter.GetVersions()
 	// Add new versions from versionGetter to status
 	for operand, version := range versions {

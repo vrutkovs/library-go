@@ -27,7 +27,9 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+	corev1listers "k8s.io/client-go/listers/core/v1"
 	ktesting "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/cache"
 	clocktesting "k8s.io/utils/clock/testing"
 )
 
@@ -548,6 +550,8 @@ func TestNewNodeStateForInstallInProgress(t *testing.T) {
 				nil,
 				nil,
 			)
+			podIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+			podLister := corev1listers.NewPodLister(podIndexer)
 			eventRecorder := events.NewRecorder(kubeClient.CoreV1().Events("test"), "test-operator", &corev1.ObjectReference{}, clocktesting.NewFakePassiveClock(time.Now()))
 			c := NewInstallerController(
 				"unit-test", "test", "test-pod",
@@ -559,6 +563,7 @@ func TestNewNodeStateForInstallInProgress(t *testing.T) {
 				kubeClient.CoreV1(),
 				kubeClient.CoreV1(),
 				kubeClient.CoreV1(),
+				podLister.Pods("test"),
 				eventRecorder,
 			)
 			c.now = func() time.Time { return now.Time }
@@ -681,7 +686,8 @@ func testSync(t *testing.T, firstInstallerBehaviour testSyncInstallerBehaviour, 
 		nil,
 		nil,
 	)
-
+	podIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+	podLister := corev1listers.NewPodLister(podIndexer)
 	eventRecorder := events.NewRecorder(kubeClient.CoreV1().Events("test"), "test-operator", &corev1.ObjectReference{}, clocktesting.NewFakePassiveClock(time.Now()))
 	podCommand := []string{"/bin/true", "--foo=test", "--bar"}
 	c := NewInstallerController(
@@ -694,6 +700,7 @@ func testSync(t *testing.T, firstInstallerBehaviour testSyncInstallerBehaviour, 
 		kubeClient.CoreV1(),
 		kubeClient.CoreV1(),
 		kubeClient.CoreV1(),
+		podLister.Pods("test"),
 		eventRecorder,
 	)
 	c.ownerRefsFn = func(ctx context.Context, revision int32) ([]metav1.OwnerReference, error) {
@@ -733,7 +740,7 @@ func testSync(t *testing.T, firstInstallerBehaviour testSyncInstallerBehaviour, 
 		t.Fatalf("not expected to create installer pod yet")
 	}
 
-	_, currStatus, _, _ := fakeStaticPodOperatorClient.GetStaticPodOperatorState()
+	_, currStatus, _, _ := fakeStaticPodOperatorClient.GetStaticPodOperatorState(t.Context())
 	if currStatus.NodeStatuses[0].TargetRevision != 3 {
 		t.Fatalf("expected target revision 3, got: %d", currStatus.NodeStatuses[0].TargetRevision)
 	}
@@ -799,7 +806,7 @@ func testSync(t *testing.T, firstInstallerBehaviour testSyncInstallerBehaviour, 
 			t.Fatal(err)
 		}
 
-		_, currStatus, _, _ = fakeStaticPodOperatorClient.GetStaticPodOperatorState()
+		_, currStatus, _, _ = fakeStaticPodOperatorClient.GetStaticPodOperatorState(t.Context())
 		if revision := currStatus.NodeStatuses[0].CurrentRevision; revision != 1 {
 			t.Fatalf("expected current revision for node to be 1, got %d", revision)
 		}
@@ -863,7 +870,7 @@ func testSync(t *testing.T, firstInstallerBehaviour testSyncInstallerBehaviour, 
 			t.Fatal(err)
 		}
 
-		_, currStatus, _, _ = fakeStaticPodOperatorClient.GetStaticPodOperatorState()
+		_, currStatus, _, _ = fakeStaticPodOperatorClient.GetStaticPodOperatorState(t.Context())
 		if revision := currStatus.NodeStatuses[0].CurrentRevision; revision != 1 {
 			t.Fatalf("expected current revision for node to be 1, got %d", revision)
 		}
@@ -889,7 +896,7 @@ func testSync(t *testing.T, firstInstallerBehaviour testSyncInstallerBehaviour, 
 		t.Fatal(err)
 	}
 
-	_, currStatus, _, _ = fakeStaticPodOperatorClient.GetStaticPodOperatorState()
+	_, currStatus, _, _ = fakeStaticPodOperatorClient.GetStaticPodOperatorState(t.Context())
 	if revision := currStatus.NodeStatuses[0].CurrentRevision; revision != 1 {
 		t.Errorf("expected current revision for node to be 1, got %d", revision)
 	}
@@ -920,7 +927,7 @@ func testSync(t *testing.T, firstInstallerBehaviour testSyncInstallerBehaviour, 
 		t.Fatal(err)
 	}
 
-	_, currStatus, _, _ = fakeStaticPodOperatorClient.GetStaticPodOperatorState()
+	_, currStatus, _, _ = fakeStaticPodOperatorClient.GetStaticPodOperatorState(t.Context())
 	if revision := currStatus.NodeStatuses[0].CurrentRevision; revision != 1 {
 		t.Fatalf("expected current revision for node to be 1, got %d", revision)
 	}
@@ -932,7 +939,7 @@ func testSync(t *testing.T, firstInstallerBehaviour testSyncInstallerBehaviour, 
 
 		if startupMonitorEnabled {
 			t.Log("startup-monitor notices static pod and update nodeStatus")
-			_, status, rv, err := fakeStaticPodOperatorClient.GetStaticPodOperatorState()
+			_, status, rv, err := fakeStaticPodOperatorClient.GetStaticPodOperatorState(t.Context())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -960,7 +967,7 @@ func testSync(t *testing.T, firstInstallerBehaviour testSyncInstallerBehaviour, 
 		if err := c.Sync(context.TODO(), factory.NewSyncContext("InstallerController", eventRecorder)); err != nil {
 			t.Fatal(err)
 		}
-		_, currStatus, _, _ = fakeStaticPodOperatorClient.GetStaticPodOperatorState()
+		_, currStatus, _, _ = fakeStaticPodOperatorClient.GetStaticPodOperatorState(t.Context())
 		if currentRevision := currStatus.NodeStatuses[0].CurrentRevision; currentRevision != 1 {
 			t.Fatalf("expected current revision for node to be 1, got %d", currentRevision)
 		}
@@ -993,7 +1000,7 @@ func testSync(t *testing.T, firstInstallerBehaviour testSyncInstallerBehaviour, 
 			t.Fatal(err)
 		}
 
-		_, currStatus, _, _ = fakeStaticPodOperatorClient.GetStaticPodOperatorState()
+		_, currStatus, _, _ = fakeStaticPodOperatorClient.GetStaticPodOperatorState(t.Context())
 		if revision := currStatus.NodeStatuses[0].CurrentRevision; revision != 1 {
 			t.Errorf("expected current revision for node to be 1, got %d", revision)
 		}
@@ -1020,7 +1027,7 @@ func testSync(t *testing.T, firstInstallerBehaviour testSyncInstallerBehaviour, 
 		kubeClient.PrependReactor("get", "pods", getPodsReactor(newStaticPod))
 
 		t.Log("startup-monitor notices 2nd static pod and update nodeStatus")
-		_, status, rv, err := fakeStaticPodOperatorClient.GetStaticPodOperatorState()
+		_, status, rv, err := fakeStaticPodOperatorClient.GetStaticPodOperatorState(t.Context())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1037,7 +1044,7 @@ func testSync(t *testing.T, firstInstallerBehaviour testSyncInstallerBehaviour, 
 		t.Fatal(err)
 	}
 
-	_, currStatus, _, _ = fakeStaticPodOperatorClient.GetStaticPodOperatorState()
+	_, currStatus, _, _ = fakeStaticPodOperatorClient.GetStaticPodOperatorState(t.Context())
 	if revision := currStatus.NodeStatuses[0].CurrentRevision; revision != 3 {
 		t.Fatalf("expected current revision for node to be 3, got %d", revision)
 	}
@@ -1092,7 +1099,8 @@ func TestCreateInstallerPod(t *testing.T) {
 		nil,
 	)
 	eventRecorder := events.NewRecorder(kubeClient.CoreV1().Events("test"), "test-operator", &corev1.ObjectReference{}, clocktesting.NewFakePassiveClock(time.Now()))
-
+	podIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+	podLister := corev1listers.NewPodLister(podIndexer)
 	c := NewInstallerController(
 		"unit-test", "test", "test-pod",
 		[]revision.RevisionResource{{Name: "test-config"}},
@@ -1103,6 +1111,7 @@ func TestCreateInstallerPod(t *testing.T) {
 		kubeClient.CoreV1(),
 		kubeClient.CoreV1(),
 		kubeClient.CoreV1(),
+		podLister.Pods("test"),
 		eventRecorder,
 	)
 	c.ownerRefsFn = func(ctx context.Context, revision int32) ([]metav1.OwnerReference, error) {
@@ -1261,7 +1270,8 @@ func TestEnsureInstallerPod(t *testing.T) {
 				nil,
 			)
 			eventRecorder := events.NewRecorder(kubeClient.CoreV1().Events("test"), "test-operator", &corev1.ObjectReference{}, clocktesting.NewFakePassiveClock(time.Now()))
-
+			podIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+			podLister := corev1listers.NewPodLister(podIndexer)
 			c := NewInstallerController(
 				"unit-test", "test", "test-pod",
 				tt.configs,
@@ -1272,6 +1282,7 @@ func TestEnsureInstallerPod(t *testing.T) {
 				kubeClient.CoreV1(),
 				kubeClient.CoreV1(),
 				kubeClient.CoreV1(),
+				podLister.Pods("test"),
 				eventRecorder,
 			)
 			c.ownerRefsFn = func(ctx context.Context, revision int32) ([]metav1.OwnerReference, error) {
@@ -2004,7 +2015,8 @@ func TestCreateInstallerPodMultiNode(t *testing.T) {
 			)
 
 			eventRecorder := events.NewRecorder(kubeClient.CoreV1().Events("test"), "test-operator", &corev1.ObjectReference{}, clocktesting.NewFakePassiveClock(time.Now()))
-
+			podIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+			podLister := corev1listers.NewPodLister(podIndexer)
 			c := NewInstallerController(
 				"unit-test", namespace, "test-pod",
 				[]revision.RevisionResource{{Name: "test-config"}},
@@ -2015,6 +2027,7 @@ func TestCreateInstallerPodMultiNode(t *testing.T) {
 				kubeClient.CoreV1(),
 				kubeClient.CoreV1(),
 				kubeClient.CoreV1(),
+				podLister.Pods("test"),
 				eventRecorder,
 			)
 			c.ownerRefsFn = func(ctx context.Context, revision int32) ([]metav1.OwnerReference, error) {
@@ -2370,7 +2383,7 @@ func TestSetConditions(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			_, status, _, err = fakeStaticPodOperatorClient.GetStaticPodOperatorState()
+			_, status, _, err = fakeStaticPodOperatorClient.GetStaticPodOperatorState(t.Context())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -2664,7 +2677,7 @@ type StubOperatorClient struct {
 	onApply func()
 }
 
-func (stub *StubOperatorClient) GetStaticPodOperatorState() (*operatorv1.StaticPodOperatorSpec, *operatorv1.StaticPodOperatorStatus, string, error) {
+func (stub *StubOperatorClient) GetStaticPodOperatorState(ctx context.Context) (*operatorv1.StaticPodOperatorSpec, *operatorv1.StaticPodOperatorStatus, string, error) {
 	return &stub.cached.Spec, &stub.cached.Status, stub.cached.ResourceVersion, nil
 }
 

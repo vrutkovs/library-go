@@ -2,10 +2,11 @@ package apiserver
 
 import (
 	"fmt"
-	clocktesting "k8s.io/utils/clock/testing"
 	"strings"
 	"testing"
 	"time"
+
+	clocktesting "k8s.io/utils/clock/testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -155,7 +156,7 @@ func TestAuditObserver(t *testing.T) {
 			observer := NewAuditObserver(getter)
 			recorder := events.NewInMemoryRecorder(t.Name(), clocktesting.NewFakePassiveClock(time.Now()))
 			for i := 1; i <= 2; i++ {
-				gotConfig, errs := observer(listers, recorder, test.existingConfig)
+				gotConfig, errs := observer(t.Context(), listers, recorder, test.existingConfig)
 
 				if test.errExpected && len(errs) == 0 {
 					t.Errorf("expected errors, got %v", errs)

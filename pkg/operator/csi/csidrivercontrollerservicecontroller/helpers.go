@@ -2,6 +2,7 @@ package csidrivercontrollerservicecontroller
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -44,7 +45,7 @@ var (
 
 // WithObservedProxyDeploymentHook creates a deployment hook that injects into the deployment's containers the observed proxy config.
 func WithObservedProxyDeploymentHook() dc.DeploymentHookFunc {
-	return func(opSpec *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
+	return func(ctx context.Context, opSpec *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
 		containerNamesString := deployment.Annotations["config.openshift.io/inject-proxy"]
 		err := v1helpers.InjectObservedProxyIntoContainers(
 			&deployment.Spec.Template.Spec,
@@ -61,8 +62,8 @@ func WithCABundleDeploymentHook(
 	configMapName string,
 	configMapInformer corev1.ConfigMapInformer,
 ) dc.DeploymentHookFunc {
-	return func(_ *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
-		cm, err := configMapInformer.Lister().ConfigMaps(configMapNamespace).Get(configMapName)
+	return func(ctx context.Context, _ *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
+		cm, err := configMapInformer.Lister().ConfigMaps(configMapNamespace).Get(ctx, configMapName)
 		if apierrors.IsNotFound(err) {
 			return nil
 		}
@@ -88,7 +89,7 @@ func WithCABundleDeploymentHook(
 
 		// Now that the CA bundle is inject into the containers, add an annotation to the deployment
 		// so that it's rolled out when the ConfigMap content changes.
-		inputHashes, err := resourcehash.MultipleObjectHashStringMapForObjectReferenceFromLister(
+		inputHashes, err := resourcehash.MultipleObjectHashStringMapForObjectReferenceFromLister(ctx,
 			configMapInformer.Lister(),
 			nil,
 			resourcehash.NewObjectRef().ForConfigMap().InNamespace(configMapNamespace).Named(configMapName),
@@ -107,8 +108,9 @@ func WithConfigMapHashAnnotationHook(
 	configMapName string,
 	configMapInformer corev1.ConfigMapInformer,
 ) dc.DeploymentHookFunc {
-	return func(opSpec *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
+	return func(ctx context.Context, opSpec *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
 		inputHashes, err := resourcehash.MultipleObjectHashStringMapForObjectReferenceFromLister(
+			ctx,
 			configMapInformer.Lister(),
 			nil,
 			resourcehash.NewObjectRef().ForConfigMap().InNamespace(namespace).Named(configMapName),
@@ -126,8 +128,9 @@ func WithSecretHashAnnotationHook(
 	secretName string,
 	secretInformer corev1.SecretInformer,
 ) dc.DeploymentHookFunc {
-	return func(opSpec *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
+	return func(ctx context.Context, opSpec *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
 		inputHashes, err := resourcehash.MultipleObjectHashStringMapForObjectReferenceFromLister(
+			ctx,
 			nil,
 			secretInformer.Lister(),
 			resourcehash.NewObjectRef().ForSecret().InNamespace(namespace).Named(secretName),
@@ -145,8 +148,8 @@ func WithSecretHashAnnotationHook(
 // Deployment RollingUpdate strategy to prevent the new pod from getting stuck
 // waiting for a node with free ports.
 func WithReplicasHook(configInformer configinformers.SharedInformerFactory) dc.DeploymentHookFunc {
-	return func(_ *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
-		infra, err := configInformer.Config().V1().Infrastructures().Lister().Get(infraConfigName)
+	return func(ctx context.Context, _ *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
+		infra, err := configInformer.Config().V1().Infrastructures().Lister().Get(ctx, infraConfigName)
 		if err != nil {
 			return err
 		}
@@ -162,9 +165,9 @@ func WithReplicasHook(configInformer configinformers.SharedInformerFactory) dc.D
 
 // WithPlaceholdersHook is a manifest hook which replaces the variable with appropriate values set
 func WithPlaceholdersHook(configInformer configinformers.SharedInformerFactory) dc.ManifestHookFunc {
-	return func(spec *opv1.OperatorSpec, manifest []byte) ([]byte, error) {
+	return func(ctx context.Context, spec *opv1.OperatorSpec, manifest []byte) ([]byte, error) {
 		pairs := []string{}
-		infra, err := configInformer.Config().V1().Infrastructures().Lister().Get(infraConfigName)
+		infra, err := configInformer.Config().V1().Infrastructures().Lister().Get(ctx, infraConfigName)
 		if err != nil {
 			return nil, err
 		}
@@ -225,7 +228,7 @@ func WithPlaceholdersHook(configInformer configinformers.SharedInformerFactory) 
 // WithServingInfo is a manifest hook that replaces ${TLS_CIPHER_SUITES} and ${TLS_MIN_VERSION}
 // placeholders with the observed configuration.
 func WithServingInfo() dc.ManifestHookFunc {
-	return func(opSpec *opv1.OperatorSpec, manifest []byte) ([]byte, error) {
+	return func(ctx context.Context, opSpec *opv1.OperatorSpec, manifest []byte) ([]byte, error) {
 		if len(opSpec.ObservedConfig.Raw) == 0 {
 			return manifest, nil
 		}
@@ -277,8 +280,8 @@ func WithServingInfo() dc.ManifestHookFunc {
 // If running with an External control plane, the nodeSelector should not include
 // master nodes.
 func WithControlPlaneTopologyHook(configInformer configinformers.SharedInformerFactory) dc.DeploymentHookFunc {
-	return func(_ *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
-		infra, err := configInformer.Config().V1().Infrastructures().Lister().Get(infraConfigName)
+	return func(ctx context.Context, opSpec *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
+		infra, err := configInformer.Config().V1().Infrastructures().Lister().Get(ctx, infraConfigName)
 		if err != nil {
 			return err
 		}
@@ -292,7 +295,7 @@ func WithControlPlaneTopologyHook(configInformer configinformers.SharedInformerF
 // WithLeaderElectionReplacerHook modifies ${LEADER_ELECTION_*} parameters in a yaml file with
 // OpenShift's recommended values.
 func WithLeaderElectionReplacerHook(defaults configv1.LeaderElection) dc.ManifestHookFunc {
-	return func(spec *opv1.OperatorSpec, manifest []byte) ([]byte, error) {
+	return func(ctx context.Context, spec *opv1.OperatorSpec, manifest []byte) ([]byte, error) {
 		pairs := []string{
 			// truncate to int() to avoid long floats ("137.000000s")
 			"${LEADER_ELECTION_LEASE_DURATION}", fmt.Sprintf("%ds", int(defaults.LeaseDuration.Seconds())),

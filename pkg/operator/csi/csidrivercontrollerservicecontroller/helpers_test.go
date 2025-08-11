@@ -144,7 +144,7 @@ func TestWithObservedProxyDeploymentHook(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			fn := WithObservedProxyDeploymentHook()
-			err := fn(&tc.initialDriver.Spec, tc.initialDeployment)
+			err := fn(t.Context(), &tc.initialDriver.Spec, tc.initialDeployment)
 			if err != nil && !tc.expectError {
 				t.Errorf("Expected no error running hook function, got: %v", err)
 
@@ -208,7 +208,7 @@ func TestWithReplicasHook(t *testing.T) {
 			configInformerFactory.Config().V1().Infrastructures().Informer().GetIndexer().Add(initialInfras[0])
 
 			fn := WithReplicasHook(configInformerFactory)
-			err := fn(nil, tc.initialDeployment)
+			err := fn(t.Context(), nil, tc.initialDeployment)
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
 			}
@@ -295,7 +295,7 @@ func TestManifestHooks(t *testing.T) {
 			configInformerFactory.Config().V1().Infrastructures().Informer().GetIndexer().Add(initialInfras[0])
 
 			fn := WithPlaceholdersHook(configInformerFactory)
-			manifest, err := fn(&tc.initialOperator.Spec, tc.initialManifest)
+			manifest, err := fn(t.Context(), &tc.initialOperator.Spec, tc.initialManifest)
 			if err != nil && !tc.expectError {
 				t.Errorf("Expected no error running hook function, got: %v", err)
 			}
@@ -336,7 +336,7 @@ func TestWithControlPlaneTopologyHook(t *testing.T) {
 			configInformerFactory.Config().V1().Infrastructures().Informer().GetIndexer().Add(initialInfras[0])
 
 			fn := WithControlPlaneTopologyHook(configInformerFactory)
-			err := fn(nil, test.initialDeployment)
+			err := fn(t.Context(), nil, test.initialDeployment)
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
 			}
@@ -445,7 +445,7 @@ func TestWithLeaderElectionReplacerHook(t *testing.T) {
 		RetryPeriod:   metav1.Duration{Duration: 3 * time.Second},
 	}
 	hook := WithLeaderElectionReplacerHook(le)
-	out, err := hook(nil, []byte(in))
+	out, err := hook(t.Context(), nil, []byte(in))
 	if err != nil {
 		t.Errorf("unexpected error: %s", err)
 	}
@@ -505,7 +505,7 @@ func TestWithServingInfoHook(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			hook := WithServingInfo()
-			out, err := hook(&tc.initialDriver.Spec, tc.initialManifest)
+			out, err := hook(t.Context(), &tc.initialDriver.Spec, tc.initialManifest)
 			if err != nil {
 				if !tc.expectedError {
 					t.Errorf("unexpected error: %s", err)

@@ -365,7 +365,7 @@ func TestToEncryptionState(t *testing.T) {
 
 	for _, scenario := range scenarios {
 		t.Run(scenario.name, func(t *testing.T) {
-			actualOutput, _ := ToEncryptionState(scenario.input, nil)
+			actualOutput, _ := ToEncryptionState(t.Context(), scenario.input, nil)
 
 			if len(actualOutput) != len(scenario.output) {
 				t.Fatalf("expected to get %d GR, got %d", len(scenario.output), len(actualOutput))

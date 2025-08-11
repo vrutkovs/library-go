@@ -262,7 +262,7 @@ type EncryptionKeysResourceTuple struct {
 
 func ValidateOperatorClientConditions(ts *testing.T, operatorClient v1helpers.OperatorClient, expectedConditions []operatorv1.OperatorCondition) {
 	ts.Helper()
-	_, status, _, err := operatorClient.GetOperatorState()
+	_, status, _, err := operatorClient.GetOperatorState(ts.Context())
 	if err != nil {
 		ts.Fatal(err)
 	}

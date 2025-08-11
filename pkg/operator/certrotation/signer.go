@@ -9,6 +9,9 @@ import (
 	"github.com/openshift/library-go/pkg/crypto"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourcehelper"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -58,9 +61,17 @@ type RotatedSigningCASecret struct {
 // EnsureSigningCertKeyPair manages the entire lifecycle of a signer cert as a secret, from creation to continued rotation.
 // It always returns the currently used CA pair, a bool indicating whether it was created/updated within this function call and an error.
 func (c RotatedSigningCASecret) EnsureSigningCertKeyPair(ctx context.Context) (*crypto.CA, bool, error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "EnsureSigningCertKeyPair", trace.WithAttributes(
+		attribute.String("controllerName", c.Name),
+		attribute.String("namespace", c.Namespace),
+		attribute.String("name", c.Name),
+	))
+	defer span.End()
+
 	creationRequired := false
 	updateRequired := false
-	originalSigningCertKeyPairSecret, err := c.Lister.Secrets(c.Namespace).Get(c.Name)
+	originalSigningCertKeyPairSecret, err := c.Lister.Secrets(c.Namespace).Get(ctx, c.Name)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, false, err
 	}
@@ -80,19 +91,19 @@ func (c RotatedSigningCASecret) EnsureSigningCertKeyPair(ctx context.Context) (*
 
 	// run Update if metadata needs changing unless we're in RefreshOnlyWhenExpired mode
 	if !c.RefreshOnlyWhenExpired {
-		needsMetadataUpdate := ensureOwnerRefAndTLSAnnotations(signingCertKeyPairSecret, c.Owner, c.AdditionalAnnotations)
-		needsTypeChange := ensureSecretTLSTypeSet(signingCertKeyPairSecret)
+		needsMetadataUpdate := ensureOwnerRefAndTLSAnnotations(ctx, signingCertKeyPairSecret, c.Owner, c.AdditionalAnnotations)
+		needsTypeChange := ensureSecretTLSTypeSet(ctx, signingCertKeyPairSecret)
 		updateRequired = needsMetadataUpdate || needsTypeChange
 	}
 
 	// run Update if signer content needs changing
 	signerUpdated := false
-	if needed, reason := needNewSigningCertKeyPair(signingCertKeyPairSecret, c.Refresh, c.RefreshOnlyWhenExpired); needed || creationRequired {
+	if needed, reason := needNewSigningCertKeyPair(ctx, signingCertKeyPairSecret, c.Refresh, c.RefreshOnlyWhenExpired); needed || creationRequired {
 		if creationRequired {
 			reason = "secret doesn't exist"
 		}
 		c.EventRecorder.Eventf("SignerUpdateRequired", "%q in %q requires a new signing cert/key pair: %v", c.Name, c.Namespace, reason)
-		if err = setSigningCertKeyPairSecretAndTLSAnnotations(signingCertKeyPairSecret, c.Validity, c.Refresh, c.AdditionalAnnotations); err != nil {
+		if err = setSigningCertKeyPairSecretAndTLSAnnotations(ctx, signingCertKeyPairSecret, c.Validity, c.Refresh, c.AdditionalAnnotations); err != nil {
 			return nil, false, err
 		}
 
@@ -103,6 +114,7 @@ func (c RotatedSigningCASecret) EnsureSigningCertKeyPair(ctx context.Context) (*
 	}
 
 	if creationRequired {
+		span.AddEvent("create required")
 		actualSigningCertKeyPairSecret, err := c.Client.Secrets(c.Namespace).Create(ctx, signingCertKeyPairSecret, metav1.CreateOptions{})
 		resourcehelper.ReportCreateEvent(c.EventRecorder, actualSigningCertKeyPairSecret, err)
 		if err != nil {
@@ -111,6 +123,7 @@ func (c RotatedSigningCASecret) EnsureSigningCertKeyPair(ctx context.Context) (*
 		klog.V(2).Infof("Created secret %s/%s", actualSigningCertKeyPairSecret.Namespace, actualSigningCertKeyPairSecret.Name)
 		signingCertKeyPairSecret = actualSigningCertKeyPairSecret
 	} else if updateRequired {
+		span.AddEvent("update required")
 		actualSigningCertKeyPairSecret, err := c.Client.Secrets(c.Namespace).Update(ctx, signingCertKeyPairSecret, metav1.UpdateOptions{})
 		if apierrors.IsConflict(err) {
 			// ignore error if its attempting to update outdated version of the secret
@@ -125,7 +138,7 @@ func (c RotatedSigningCASecret) EnsureSigningCertKeyPair(ctx context.Context) (*
 	}
 
 	// at this point, the secret has the correct signer, so we should read that signer to be able to sign
-	signingCertKeyPair, err := crypto.GetCAFromBytes(signingCertKeyPairSecret.Data["tls.crt"], signingCertKeyPairSecret.Data["tls.key"])
+	signingCertKeyPair, err := crypto.GetCAFromBytes(ctx, signingCertKeyPairSecret.Data["tls.crt"], signingCertKeyPairSecret.Data["tls.key"])
 	if err != nil {
 		return nil, signerUpdated, err
 	}
@@ -149,7 +162,14 @@ func ensureOwnerReference(meta *metav1.ObjectMeta, owner *metav1.OwnerReference)
 	return false
 }
 
-func needNewSigningCertKeyPair(secret *corev1.Secret, refresh time.Duration, refreshOnlyWhenExpired bool) (bool, string) {
+func needNewSigningCertKeyPair(ctx context.Context, secret *corev1.Secret, refresh time.Duration, refreshOnlyWhenExpired bool) (bool, string) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "needNewSigningCertKeyPair", trace.WithAttributes(
+		attribute.String("namespace", secret.Namespace),
+		attribute.String("name", secret.Name),
+	))
+	defer span.End()
+
 	annotations := secret.Annotations
 	notBefore, notAfter, reason := getValidityFromAnnotations(annotations)
 	if len(reason) > 0 {
@@ -201,18 +221,32 @@ func getValidityFromAnnotations(annotations map[string]string) (notBefore time.T
 
 // setSigningCertKeyPairSecretAndTLSAnnotations generates a new signing certificate and key pair,
 // stores them in the specified secret, and adds predefined TLS annotations to that secret.
-func setSigningCertKeyPairSecretAndTLSAnnotations(signingCertKeyPairSecret *corev1.Secret, validity, refresh time.Duration, tlsAnnotations AdditionalAnnotations) error {
-	ca, err := setSigningCertKeyPairSecret(signingCertKeyPairSecret, validity)
+func setSigningCertKeyPairSecretAndTLSAnnotations(ctx context.Context, signingCertKeyPairSecret *corev1.Secret, validity, refresh time.Duration, tlsAnnotations AdditionalAnnotations) error {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "setSigningCertKeyPairSecretAndTLSAnnotations", trace.WithAttributes(
+		attribute.String("namespace", signingCertKeyPairSecret.Namespace),
+		attribute.String("name", signingCertKeyPairSecret.Name),
+	))
+	defer span.End()
+
+	ca, err := setSigningCertKeyPairSecret(ctx, signingCertKeyPairSecret, validity)
 	if err != nil {
 		return err
 	}
 
-	setTLSAnnotationsOnSigningCertKeyPairSecret(signingCertKeyPairSecret, ca, refresh, tlsAnnotations)
+	setTLSAnnotationsOnSigningCertKeyPairSecret(ctx, signingCertKeyPairSecret, ca, refresh, tlsAnnotations)
 	return nil
 }
 
 // setSigningCertKeyPairSecret creates a new signing cert/key pair and sets them in the secret
-func setSigningCertKeyPairSecret(signingCertKeyPairSecret *corev1.Secret, validity time.Duration) (*crypto.TLSCertificateConfig, error) {
+func setSigningCertKeyPairSecret(ctx context.Context, signingCertKeyPairSecret *corev1.Secret, validity time.Duration) (*crypto.TLSCertificateConfig, error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "setSigningCertKeyPairSecret", trace.WithAttributes(
+		attribute.String("namespace", signingCertKeyPairSecret.Namespace),
+		attribute.String("name", signingCertKeyPairSecret.Name),
+	))
+	defer span.End()
+
 	signerName := fmt.Sprintf("%s_%s@%d", signingCertKeyPairSecret.Namespace, signingCertKeyPairSecret.Name, time.Now().Unix())
 	ca, err := crypto.MakeSelfSignedCAConfigForDuration(signerName, validity)
 	if err != nil {
@@ -243,7 +277,13 @@ func setSigningCertKeyPairSecret(signingCertKeyPairSecret *corev1.Secret, validi
 //
 // These assumptions are safe because this function is only called after the secret
 // has been initialized in setSigningCertKeyPairSecret.
-func setTLSAnnotationsOnSigningCertKeyPairSecret(signingCertKeyPairSecret *corev1.Secret, ca *crypto.TLSCertificateConfig, refresh time.Duration, tlsAnnotations AdditionalAnnotations) {
+func setTLSAnnotationsOnSigningCertKeyPairSecret(ctx context.Context, signingCertKeyPairSecret *corev1.Secret, ca *crypto.TLSCertificateConfig, refresh time.Duration, tlsAnnotations AdditionalAnnotations) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "setTLSAnnotationsOnSigningCertKeyPairSecret", trace.WithAttributes(
+		attribute.String("namespace", signingCertKeyPairSecret.Namespace),
+		attribute.String("name", signingCertKeyPairSecret.Name),
+	))
+	defer span.End()
 	signingCertKeyPairSecret.Annotations[CertificateIssuer] = ca.Certs[0].Issuer.CommonName
 
 	tlsAnnotations.NotBefore = ca.Certs[0].NotBefore.Format(time.RFC3339)

@@ -1,6 +1,7 @@
 package network
 
 import (
+	"context"
 	"fmt"
 	"net"
 
@@ -12,8 +13,8 @@ import (
 )
 
 // GetClusterCIDRs reads the cluster CIDRs from the global network configuration resource. Emits events if CIDRs are not found.
-func GetClusterCIDRs(lister configlistersv1.NetworkLister, recorder events.Recorder) ([]string, error) {
-	network, err := lister.Get("cluster")
+func GetClusterCIDRs(ctx context.Context, lister configlistersv1.NetworkLister, recorder events.Recorder) ([]string, error) {
+	network, err := lister.Get(ctx, "cluster")
 	if errors.IsNotFound(err) {
 		recorder.Warningf("GetClusterCIDRsFailed", "Required networks.%s/cluster not found", configv1.GroupName)
 		return nil, nil
@@ -41,8 +42,8 @@ func GetClusterCIDRs(lister configlistersv1.NetworkLister, recorder events.Recor
 }
 
 // GetServiceCIDRs reads the service IP ranges from the global network configuration resource. Emits events if CIDRs are not found.
-func GetServiceCIDRs(lister configlistersv1.NetworkLister, recorder events.Recorder) ([]string, error) {
-	network, err := lister.Get("cluster")
+func GetServiceCIDRs(ctx context.Context, lister configlistersv1.NetworkLister, recorder events.Recorder) ([]string, error) {
+	network, err := lister.Get(ctx, "cluster")
 	if errors.IsNotFound(err) {
 		recorder.Warningf("GetServiceCIDRFailed", "Required networks.%s/cluster not found", configv1.GroupName)
 		return nil, nil
@@ -62,8 +63,8 @@ func GetServiceCIDRs(lister configlistersv1.NetworkLister, recorder events.Recor
 
 // GetExternalIPPolicy retrieves the ExternalIPPolicy for the cluster.
 // The policy may be null.
-func GetExternalIPPolicy(lister configlistersv1.NetworkLister, recorder events.Recorder) (*configv1.ExternalIPPolicy, error) {
-	network, err := lister.Get("cluster")
+func GetExternalIPPolicy(ctx context.Context, lister configlistersv1.NetworkLister, recorder events.Recorder) (*configv1.ExternalIPPolicy, error) {
+	network, err := lister.Get(ctx, "cluster")
 	if errors.IsNotFound(err) {
 		recorder.Warningf("GetExternalIPPolicyFailed", "Required networks.%s/cluster not found", configv1.GroupName)
 		return nil, nil
@@ -93,8 +94,8 @@ func GetExternalIPPolicy(lister configlistersv1.NetworkLister, recorder events.R
 }
 
 // GetExternalIPAutoAssignCIDRs retrieves the ExternalIPAutoAssignCIDRs, if configured.
-func GetExternalIPAutoAssignCIDRs(lister configlistersv1.NetworkLister, recorder events.Recorder) ([]string, error) {
-	network, err := lister.Get("cluster")
+func GetExternalIPAutoAssignCIDRs(ctx context.Context, lister configlistersv1.NetworkLister, recorder events.Recorder) ([]string, error) {
+	network, err := lister.Get(ctx, "cluster")
 	if errors.IsNotFound(err) {
 		recorder.Warningf("GetExternalIPAutoAssignCIDRsFailed", "Required networks.%s/cluster not found", configv1.GroupName)
 		return nil, nil
@@ -129,8 +130,8 @@ func validateCIDRs(in []string) error {
 }
 
 // GetServiceNodePortRange retrieves the ServiceNodePortRange for the cluster.
-func GetServiceNodePortRange(lister configlistersv1.NetworkLister, recorder events.Recorder) (string, error) {
-	network, err := lister.Get("cluster")
+func GetServiceNodePortRange(ctx context.Context, lister configlistersv1.NetworkLister, recorder events.Recorder) (string, error) {
+	network, err := lister.Get(ctx, "cluster")
 	if errors.IsNotFound(err) {
 		recorder.Warningf("GetServiceNodePortRangeFailed", "Required networks.%s/cluster not found", configv1.GroupName)
 		return "", nil

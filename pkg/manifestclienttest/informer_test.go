@@ -47,14 +47,14 @@ func TestBasicInformer(t *testing.T) {
 					t.Fatal("failed to sync")
 				}
 
-				featureGatesCluster, err := featureGateInformer.Lister().Get("cluster")
+				featureGatesCluster, err := featureGateInformer.Lister().Get(ctx, "cluster")
 				if err != nil {
 					t.Fatal(err)
 				}
 				if len(featureGatesCluster.Status.FeatureGates) == 0 {
 					t.Fatal(spew.Sdump(featureGatesCluster))
 				}
-				missing, err := featureGateInformer.Lister().Get("missing")
+				missing, err := featureGateInformer.Lister().Get(ctx, "missing")
 				if !apierrors.IsNotFound(err) {
 					t.Fatal(err)
 				}

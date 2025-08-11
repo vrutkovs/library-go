@@ -105,7 +105,7 @@ func (c *CSIStorageClassController) Sync(ctx context.Context, syncCtx factory.Sy
 	klog.V(4).Infof("StorageClassController sync started")
 	defer klog.V(4).Infof("StorageClassController sync finished")
 
-	opSpec, _, _, err := c.operatorClient.GetOperatorState()
+	opSpec, _, _, err := c.operatorClient.GetOperatorState(ctx)
 	if err != nil {
 		return err
 	}
@@ -137,7 +137,7 @@ func (c *CSIStorageClassController) syncStorageClass(ctx context.Context, opSpec
 		}
 	}
 
-	err = SetDefaultStorageClass(c.storageClassLister, expectedSC)
+	err = SetDefaultStorageClass(ctx, c.storageClassLister, expectedSC)
 	if err != nil {
 		return err
 	}
@@ -145,8 +145,8 @@ func (c *CSIStorageClassController) syncStorageClass(ctx context.Context, opSpec
 	return c.scStateEvaluator.EvalAndApplyStorageClass(ctx, expectedSC)
 }
 
-func SetDefaultStorageClass(storageClassLister v1.StorageClassLister, storageClass *storagev1.StorageClass) error {
-	existingSCs, err := storageClassLister.List(labels.Everything())
+func SetDefaultStorageClass(ctx context.Context, storageClassLister v1.StorageClassLister, storageClass *storagev1.StorageClass) error {
+	existingSCs, err := storageClassLister.List(ctx, labels.Everything())
 	if err != nil {
 		return err
 	}
@@ -210,9 +210,9 @@ func NewStorageClassStateEvaluator(
 // GetStorageClassState accepts the name of a ClusterCSIDriver and returns the
 // StorageClassState associated with that object. If the ClusterCSIDriver is not
 // found, this function returns the default state (Managed).
-func (e *StorageClassStateEvaluator) GetStorageClassState(ccdName string) operatorapi.StorageClassStateName {
+func (e *StorageClassStateEvaluator) GetStorageClassState(ctx context.Context, ccdName string) operatorapi.StorageClassStateName {
 	scState := operatorapi.ManagedStorageClass
-	clusterCSIDriver, err := e.clusterCSIDriverLister.Get(ccdName)
+	clusterCSIDriver, err := e.clusterCSIDriverLister.Get(ctx, ccdName)
 	if err != nil {
 		klog.V(4).Infof("failed to get ClusterCSIDriver %s, assuming Managed StorageClassState: %v", ccdName, err)
 	} else {
@@ -241,7 +241,7 @@ func (e *StorageClassStateEvaluator) ApplyStorageClass(ctx context.Context, expe
 }
 
 func (e *StorageClassStateEvaluator) EvalAndApplyStorageClass(ctx context.Context, expectedSC *storagev1.StorageClass) error {
-	scState := e.GetStorageClassState(expectedSC.Provisioner)
+	scState := e.GetStorageClassState(ctx, expectedSC.Provisioner)
 	return e.ApplyStorageClass(ctx, expectedSC, scState)
 }
 

@@ -2,10 +2,11 @@ package deploymentcontroller
 
 import (
 	"context"
-	clocktesting "k8s.io/utils/clock/testing"
 	"os"
 	"sort"
 	"time"
+
+	clocktesting "k8s.io/utils/clock/testing"
 
 	"github.com/google/go-cmp/cmp"
 	opv1 "github.com/openshift/api/operator/v1"
@@ -669,7 +670,7 @@ func TestSync(t *testing.T) {
 
 			// Check expectedObjects.operator.Status
 			if test.expectedObjects.operator != nil {
-				_, actualStatus, _, err := ctx.operatorClient.GetOperatorState()
+				_, actualStatus, _, err := ctx.operatorClient.GetOperatorState(t.Context())
 				if err != nil {
 					t.Errorf("Failed to get operator: %v", err)
 				}

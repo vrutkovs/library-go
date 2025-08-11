@@ -7,6 +7,9 @@ import (
 	"strings"
 	"time"
 
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -54,7 +57,7 @@ func NewInstallerStateController(instanceName string,
 	}
 
 	return factory.New().
-		WithInformers(kubeInformersForTargetNamespace.Core().V1().Pods().Informer()).
+		WithInformersQueueKeyFunc(v1helpers.ObjToString, kubeInformersForTargetNamespace.Core().V1().Pods().Informer()).
 		WithSync(c.sync).
 		ResyncEvery(1*time.Minute).
 		WithControllerInstanceName(c.controllerInstanceName).
@@ -80,6 +83,12 @@ func installerNameToRevision(name string) (int, error) {
 }
 
 func (c *InstallerStateController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "ckao.InstallerStateController", trace.WithAttributes(
+		attribute.String("aaaQueueKey", syncCtx.QueueKey()),
+	))
+	defer span.End()
+
 	pods, err := c.podsGetter.Pods(c.targetNamespace).List(ctx, metav1.ListOptions{
 		LabelSelector: labels.SelectorFromSet(labels.Set{"app": "installer"}).String(),
 	})

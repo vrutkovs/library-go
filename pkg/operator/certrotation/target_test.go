@@ -3,10 +3,11 @@ package certrotation
 import (
 	"context"
 	"crypto/x509/pkix"
-	clocktesting "k8s.io/utils/clock/testing"
 	"strings"
 	"testing"
 	"time"
+
+	clocktesting "k8s.io/utils/clock/testing"
 
 	"github.com/davecgh/go-spew/spew"
 
@@ -403,7 +404,7 @@ func TestEnsureTargetSignerCertKeyPair(t *testing.T) {
 					t.Errorf("expected certificate type 'target', got: %v", certType)
 				}
 
-				signingCertKeyPair, err := crypto.GetCAFromBytes(actual.Data["tls.crt"], actual.Data["tls.key"])
+				signingCertKeyPair, err := crypto.GetCAFromBytes(t.Context(), actual.Data["tls.crt"], actual.Data["tls.key"])
 				if err != nil {
 					t.Error(actual.Data)
 				}
@@ -447,7 +448,7 @@ func TestEnsureTargetSignerCertKeyPair(t *testing.T) {
 					t.Errorf("expected certificate type 'target', got: %v", certType)
 				}
 
-				signingCertKeyPair, err := crypto.GetCAFromBytes(actual.Data["tls.crt"], actual.Data["tls.key"])
+				signingCertKeyPair, err := crypto.GetCAFromBytes(t.Context(), actual.Data["tls.crt"], actual.Data["tls.key"])
 				if err != nil {
 					t.Error(actual.Data)
 				}

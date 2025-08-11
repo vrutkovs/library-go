@@ -91,7 +91,7 @@ func NewCredentialsRequestController(
 }
 
 func (c CredentialsRequestController) sync(ctx context.Context, syncContext factory.SyncContext) error {
-	spec, status, _, err := c.operatorClient.GetOperatorState()
+	spec, status, _, err := c.operatorClient.GetOperatorState(ctx)
 	if apierrors.IsNotFound(err) {
 		return nil
 	}
@@ -104,7 +104,7 @@ func (c CredentialsRequestController) sync(ctx context.Context, syncContext fact
 
 	cr := resourceread.ReadCredentialRequestsOrDie(c.manifest)
 
-	sync, err := shouldSync(c.operatorLister, cr)
+	sync, err := shouldSync(ctx, c.operatorLister, cr)
 	if err != nil {
 		return err
 	}
@@ -231,8 +231,8 @@ func isProvisioned(cr *unstructured.Unstructured) (bool, error) {
 	return provisionedValBool, nil
 }
 
-func shouldSync(cloudCredentialLister operatorv1lister.CloudCredentialLister, cr *unstructured.Unstructured) (bool, error) {
-	clusterCloudCredential, err := cloudCredentialLister.Get(clusterCloudCredentialName)
+func shouldSync(ctx context.Context, cloudCredentialLister operatorv1lister.CloudCredentialLister, cr *unstructured.Unstructured) (bool, error) {
+	clusterCloudCredential, err := cloudCredentialLister.Get(ctx, clusterCloudCredentialName)
 	if err != nil {
 		klog.Errorf("Failed to get cluster cloud credential: %v", err)
 		return false, err

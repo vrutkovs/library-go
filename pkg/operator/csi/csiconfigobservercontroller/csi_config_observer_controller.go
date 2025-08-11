@@ -1,6 +1,7 @@
 package csiconfigobservercontroller
 
 import (
+	"context"
 	"strings"
 
 	"k8s.io/client-go/tools/cache"
@@ -102,6 +103,6 @@ func NewCSIConfigObserverController(
 	return c
 }
 
-func observeTLSSecurityProfile(genericListers configobserver.Listers, recorder events.Recorder, existingConfig map[string]interface{}) (map[string]interface{}, []error) {
-	return libgoapiserver.ObserveTLSSecurityProfileWithPaths(genericListers, recorder, existingConfig, MinTLSVersionPath(), CipherSuitesPath())
+func observeTLSSecurityProfile(ctx context.Context, genericListers configobserver.Listers, recorder events.Recorder, existingConfig map[string]interface{}) (map[string]interface{}, []error) {
+	return libgoapiserver.ObserveTLSSecurityProfileWithPaths(ctx, genericListers, recorder, existingConfig, MinTLSVersionPath(), CipherSuitesPath())
 }

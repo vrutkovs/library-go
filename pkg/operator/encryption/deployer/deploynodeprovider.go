@@ -1,6 +1,8 @@
 package deployer
 
 import (
+	"context"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	appsv1informers "k8s.io/client-go/informers/apps/v1"
@@ -30,8 +32,8 @@ func NewDeploymentNodeProvider(targetNamespace string, kubeInformersForNamespace
 	}
 }
 
-func (p DeploymentNodeProvider) MasterNodeNames() ([]string, error) {
-	deploy, err := p.targetNamespaceDeploymentLister.Get("apiserver")
+func (p DeploymentNodeProvider) MasterNodeNames(ctx context.Context) ([]string, error) {
+	deploy, err := p.targetNamespaceDeploymentLister.Get(ctx, "apiserver")
 	if err != nil && errors.IsNotFound(err) {
 		return nil, nil
 	}
@@ -39,7 +41,7 @@ func (p DeploymentNodeProvider) MasterNodeNames() ([]string, error) {
 		return nil, err
 	}
 
-	nodes, err := p.nodeInformer.Lister().List(labels.SelectorFromSet(deploy.Spec.Template.Spec.NodeSelector))
+	nodes, err := p.nodeInformer.Lister().List(ctx, labels.SelectorFromSet(deploy.Spec.Template.Spec.NodeSelector))
 	if err != nil {
 		return nil, err
 	}

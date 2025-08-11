@@ -88,7 +88,7 @@ func NewCSRApproverController(
 }
 
 func (c *csrApproverController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	csr, err := c.csrLister.Get(syncCtx.QueueKey())
+	csr, err := c.csrLister.Get(ctx, syncCtx.QueueKey())
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil

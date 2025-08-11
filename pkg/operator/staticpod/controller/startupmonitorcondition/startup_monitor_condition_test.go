@@ -163,7 +163,7 @@ func TestStartupMonitorPodConditionController(t *testing.T) {
 				t.Error(err)
 			}
 
-			_, actualOperatorStatus, _, err := fakeOperatorClient.GetOperatorState()
+			_, actualOperatorStatus, _, err := fakeOperatorClient.GetOperatorState(t.Context())
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -539,7 +539,7 @@ func TestNodeControllerDegradedConditionType(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			_, status, _, _ := fakeStaticPodOperatorClient.GetStaticPodOperatorState()
+			_, status, _, _ := fakeStaticPodOperatorClient.GetStaticPodOperatorState(t.Context())
 			if err := scenario.verifyNodeStatus(status.OperatorStatus.Conditions); err != nil {
 				t.Errorf("%s: failed to verify operator conditions: %v", scenario.name, err)
 			}
@@ -720,7 +720,7 @@ func TestNewNodeController(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			_, status, _, _ := fakeStaticPodOperatorClient.GetStaticPodOperatorState()
+			_, status, _, _ := fakeStaticPodOperatorClient.GetStaticPodOperatorState(t.Context())
 
 			if err := test.evaluateNodeStatus(status.NodeStatuses); err != nil {
 				t.Errorf("%s: failed to evaluate node status: %v", test.name, err)

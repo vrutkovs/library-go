@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"strings"
 
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	coreapiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/informers"
@@ -50,7 +53,7 @@ func NewNodeController(
 	c.masterNodesSelector = masterNodesSelector
 
 	return factory.New().
-		WithInformers(
+		WithInformersQueueKeyFunc(v1helpers.ObjToString,
 			operatorClient.Informer(),
 			kubeInformersClusterScoped.Core().V1().Nodes().Informer(),
 		).
@@ -63,12 +66,18 @@ func NewNodeController(
 }
 
 func (c *NodeController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	_, originalOperatorStatus, _, err := c.operatorClient.GetStaticPodOperatorState()
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "ckao.NodeController", trace.WithAttributes(
+		attribute.String("aaaQueueKey", syncCtx.QueueKey()),
+	))
+	defer span.End()
+
+	_, originalOperatorStatus, _, err := c.operatorClient.GetStaticPodOperatorState(ctx)
 	if err != nil {
 		return err
 	}
 
-	nodes, err := c.nodeLister.List(c.masterNodesSelector)
+	nodes, err := c.nodeLister.List(ctx, c.masterNodesSelector)
 	if err != nil {
 		return err
 	}
@@ -77,7 +86,7 @@ func (c *NodeController) sync(ctx context.Context, syncCtx factory.SyncContext) 
 	// selectors as well as selectors that want to OR with master nodes.
 	// see: https://github.com/kubernetes/kubernetes/issues/90549#issuecomment-620625847
 	if c.extraNodeSelector != nil {
-		extraNodes, err := c.nodeLister.List(c.extraNodeSelector)
+		extraNodes, err := c.nodeLister.List(ctx, c.extraNodeSelector)
 		if err != nil {
 			return err
 		}

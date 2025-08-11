@@ -194,7 +194,7 @@ func TestInstallerStateController(t *testing.T) {
 				return
 			}
 
-			_, status, _, err := fakeStaticPodOperatorClient.GetOperatorState()
+			_, status, _, err := fakeStaticPodOperatorClient.GetOperatorState(t.Context())
 			if err != nil {
 				t.Error(err)
 				return

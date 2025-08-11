@@ -1,6 +1,7 @@
 package latencyprofilecontroller
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -17,7 +18,7 @@ import (
 const (
 	// static pod revision config maps used by installer controller to track
 	// configs across different revisions
-	revisionConfigMapName = "config"
+	RevisionConfigMapName = "config"
 	revisionConfigMapKey  = "config.yaml"
 
 	revisionZeroMessage           = "one or more static pod(s) are at revision 0 and updating latency profile"
@@ -45,7 +46,7 @@ func NewInstallerRevisionConfigMatcher(
 	return ret.matchProfileForActiveRevisions
 }
 
-func (r *revisionConfigMatcher) matchProfileForActiveRevisions(profile configv1.WorkerLatencyProfileType, activeRevisions []int32) (match bool, syncMsg string, err error) {
+func (r *revisionConfigMatcher) matchProfileForActiveRevisions(ctx context.Context, profile configv1.WorkerLatencyProfileType, activeRevisions []int32) (match bool, syncMsg string, err error) {
 	if nodeobserver.IsDayZero(activeRevisions) {
 		return false, revisionZeroMessage, nil
 	}
@@ -59,8 +60,8 @@ func (r *revisionConfigMatcher) matchProfileForActiveRevisions(profile configv1.
 			return false, revisionZeroMessage, nil
 		}
 
-		configMapNameWithRevision := fmt.Sprintf("%s-%d", revisionConfigMapName, revision)
-		configMap, err := r.configMapLister.Get(configMapNameWithRevision)
+		configMapNameWithRevision := fmt.Sprintf("%s-%d", RevisionConfigMapName, revision)
+		configMap, err := r.configMapLister.Get(ctx, configMapNameWithRevision)
 		if err != nil {
 			return false, "", err
 		}

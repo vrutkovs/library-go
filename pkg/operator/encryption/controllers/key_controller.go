@@ -31,7 +31,12 @@ import (
 	"github.com/openshift/library-go/pkg/operator/encryption/state"
 	"github.com/openshift/library-go/pkg/operator/encryption/statemachine"
 	"github.com/openshift/library-go/pkg/operator/events"
+	"github.com/openshift/library-go/pkg/operator/v1helpers"
 	operatorv1helpers "github.com/openshift/library-go/pkg/operator/v1helpers"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // encryptionSecretMigrationInterval determines how much time must pass after a key has been observed as
@@ -108,7 +113,7 @@ func NewKeyController(
 		WithSync(c.sync).
 		WithControllerInstanceName(c.controllerInstanceName).
 		ResyncEvery(time.Minute).
-		WithInformers(
+		WithInformersQueueKeyFunc(v1helpers.ObjToString,
 			apiServerInformer.Informer(),
 			operatorClient.Informer(),
 			kubeInformersForNamespaces.InformersFor("openshift-config-managed").Core().V1().Secrets().Informer(),
@@ -120,6 +125,14 @@ func NewKeyController(
 }
 
 func (c *keyController) sync(ctx context.Context, syncCtx factory.SyncContext) (err error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "ckao.encryption.keyController", trace.WithAttributes(
+		attribute.String("controllerInstanceName", c.controllerInstanceName),
+		attribute.String("instanceName", c.instanceName),
+		attribute.String("aaaQueueKey", syncCtx.QueueKey()),
+	))
+	defer span.End()
+
 	// The status for this condition is intentionally omitted to ensure it's correctly set in each branch
 	degradedCondition := applyoperatorv1.OperatorCondition().
 		WithType("EncryptionKeyControllerDegraded")
@@ -134,7 +147,7 @@ func (c *keyController) sync(ctx context.Context, syncCtx factory.SyncContext) (
 		}
 	}()
 
-	if ready, err := shouldRunEncryptionController(c.operatorClient, c.preconditionsFulfilledFn, c.provider.ShouldRunEncryptionControllers); err != nil || !ready {
+	if ready, err := shouldRunEncryptionController(ctx, c.operatorClient, c.preconditionsFulfilledFn, c.provider.ShouldRunEncryptionControllers); err != nil || !ready {
 		if err != nil {
 			degradedCondition = nil
 		} else {
@@ -159,6 +172,10 @@ func (c *keyController) sync(ctx context.Context, syncCtx factory.SyncContext) (
 }
 
 func (c *keyController) checkAndCreateKeys(ctx context.Context, syncContext factory.SyncContext, encryptedGRs []schema.GroupResource) error {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "encryption.checkAndCreateKeys")
+	defer span.End()
+
 	currentMode, externalReason, err := c.getCurrentModeAndExternalReason(ctx)
 	if err != nil {
 		return err
@@ -191,7 +208,7 @@ func (c *keyController) checkAndCreateKeys(ctx context.Context, syncContext fact
 
 	var commonReason *string
 	for gr, grKeys := range desiredEncryptionState {
-		latestKeyID, internalReason, needed := needsNewKey(grKeys, currentMode, externalReason, encryptedGRs)
+		latestKeyID, internalReason, needed := needsNewKey(ctx, grKeys, currentMode, externalReason, encryptedGRs)
 		if !needed {
 			continue
 		}
@@ -218,7 +235,7 @@ func (c *keyController) checkAndCreateKeys(ctx context.Context, syncContext fact
 
 	sort.Sort(sort.StringSlice(reasons))
 	internalReason := strings.Join(reasons, ", ")
-	keySecret, err := c.generateKeySecret(newKeyID, currentMode, internalReason, externalReason)
+	keySecret, err := c.generateKeySecret(ctx, newKeyID, currentMode, internalReason, externalReason)
 	if err != nil {
 		return fmt.Errorf("failed to create key: %v", err)
 	}
@@ -237,6 +254,10 @@ func (c *keyController) checkAndCreateKeys(ctx context.Context, syncContext fact
 }
 
 func (c *keyController) validateExistingSecret(ctx context.Context, keySecret *corev1.Secret, keyID uint64) error {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "encryption.validateExistingSecret")
+	defer span.End()
+
 	actualKeySecret, err := c.secretClient.Secrets("openshift-config-managed").Get(ctx, keySecret.Name, metav1.GetOptions{})
 	if err != nil {
 		return err
@@ -255,7 +276,11 @@ func (c *keyController) validateExistingSecret(ctx context.Context, keySecret *c
 	return nil // we made this key earlier
 }
 
-func (c *keyController) generateKeySecret(keyID uint64, currentMode state.Mode, internalReason, externalReason string) (*corev1.Secret, error) {
+func (c *keyController) generateKeySecret(ctx context.Context, keyID uint64, currentMode state.Mode, internalReason, externalReason string) (*corev1.Secret, error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "encryption.generateKeySecret")
+	defer span.End()
+
 	bs := crypto.ModeToNewKeyFunc[currentMode]()
 	ks := state.KeyState{
 		Key: apiserverv1.Key{
@@ -270,12 +295,16 @@ func (c *keyController) generateKeySecret(keyID uint64, currentMode state.Mode, 
 }
 
 func (c *keyController) getCurrentModeAndExternalReason(ctx context.Context) (state.Mode, string, error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "encryption.getCurrentModeAndExternalReason")
+	defer span.End()
+
 	apiServer, err := c.apiServerClient.Get(ctx, "cluster", metav1.GetOptions{})
 	if err != nil {
 		return "", "", err
 	}
 
-	operatorSpec, _, _, err := c.operatorClient.GetOperatorState()
+	operatorSpec, _, _, err := c.operatorClient.GetOperatorState(ctx)
 	if err != nil {
 		return "", "", err
 	}
@@ -298,7 +327,11 @@ func (c *keyController) getCurrentModeAndExternalReason(ctx context.Context) (st
 
 // needsNewKey checks whether a new key must be created for the given resource. If true, it also returns the latest
 // used key ID and a reason string.
-func needsNewKey(grKeys state.GroupResourceState, currentMode state.Mode, externalReason string, encryptedGRs []schema.GroupResource) (uint64, string, bool) {
+func needsNewKey(ctx context.Context, grKeys state.GroupResourceState, currentMode state.Mode, externalReason string, encryptedGRs []schema.GroupResource) (uint64, string, bool) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "encryption.getCurrentModeAndExternalReason")
+	defer span.End()
+
 	// we always need to have some encryption keys unless we are turned off
 	if len(grKeys.ReadKeys) == 0 {
 		return 0, "key-does-not-exist", currentMode != state.Identity

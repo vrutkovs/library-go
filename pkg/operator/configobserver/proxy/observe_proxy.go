@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"context"
 	"reflect"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -28,7 +29,7 @@ type observeProxyFlags struct {
 
 // ObserveProxyConfig observes the proxy.config.openshift.io/cluster object and writes
 // its content to an unstructured object in a string map at the path from the constructor
-func (f *observeProxyFlags) ObserveProxyConfig(genericListers configobserver.Listers, recorder events.Recorder, existingConfig map[string]interface{}) (ret map[string]interface{}, _ []error) {
+func (f *observeProxyFlags) ObserveProxyConfig(ctx context.Context, genericListers configobserver.Listers, recorder events.Recorder, existingConfig map[string]interface{}) (ret map[string]interface{}, _ []error) {
 	defer func() {
 		ret = configobserver.Pruned(ret, f.configPath)
 	}()
@@ -37,7 +38,7 @@ func (f *observeProxyFlags) ObserveProxyConfig(genericListers configobserver.Lis
 
 	errs := []error{}
 	observedConfig := map[string]interface{}{}
-	proxyConfig, err := proxyLister.ProxyLister().Get("cluster")
+	proxyConfig, err := proxyLister.ProxyLister().Get(ctx, "cluster")
 	if errors.IsNotFound(err) {
 		recorder.Warningf("ObserveProxyConfig", "proxy.%s/cluster not found", configv1.GroupName)
 		return observedConfig, errs

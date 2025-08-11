@@ -1,10 +1,11 @@
 package network
 
 import (
-	clocktesting "k8s.io/utils/clock/testing"
 	"reflect"
 	"testing"
 	"time"
+
+	clocktesting "k8s.io/utils/clock/testing"
 
 	"sigs.k8s.io/yaml"
 
@@ -64,7 +65,7 @@ func TestObserveClusterCIDRs(t *testing.T) {
 			if err := indexer.Add(test.config); err != nil {
 				t.Fatal(err.Error())
 			}
-			result, err := GetClusterCIDRs(configlistersv1.NewNetworkLister(indexer), events.NewInMemoryRecorder("network", clocktesting.NewFakePassiveClock(time.Now())))
+			result, err := GetClusterCIDRs(t.Context(), configlistersv1.NewNetworkLister(indexer), events.NewInMemoryRecorder("network", clocktesting.NewFakePassiveClock(time.Now())))
 			if err != nil && !test.expectedError {
 				t.Fatal(err)
 			} else if err == nil {
@@ -90,7 +91,7 @@ func TestObserveServiceClusterIPRanges(t *testing.T) {
 	); err != nil {
 		t.Fatal(err.Error())
 	}
-	result, err := GetServiceCIDRs(configlistersv1.NewNetworkLister(indexer), events.NewInMemoryRecorder("network", clocktesting.NewFakePassiveClock(time.Now())))
+	result, err := GetServiceCIDRs(t.Context(), configlistersv1.NewNetworkLister(indexer), events.NewInMemoryRecorder("network", clocktesting.NewFakePassiveClock(time.Now())))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -148,7 +149,7 @@ func TestObserveServiceNodePortRange(t *testing.T) {
 			if err := indexer.Add(test.config); err != nil {
 				t.Fatal(err.Error())
 			}
-			result, err := GetServiceNodePortRange(configlistersv1.NewNetworkLister(indexer), events.NewInMemoryRecorder("network", clocktesting.NewFakePassiveClock(time.Now())))
+			result, err := GetServiceNodePortRange(t.Context(), configlistersv1.NewNetworkLister(indexer), events.NewInMemoryRecorder("network", clocktesting.NewFakePassiveClock(time.Now())))
 			if err != nil && !test.expectedError {
 				t.Fatal(err)
 			} else if err == nil {

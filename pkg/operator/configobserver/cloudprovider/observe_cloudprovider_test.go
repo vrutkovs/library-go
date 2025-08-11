@@ -1,9 +1,11 @@
 package cloudprovider
 
 import (
-	clocktesting "k8s.io/utils/clock/testing"
+	"context"
 	"testing"
 	"time"
+
+	clocktesting "k8s.io/utils/clock/testing"
 
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 
@@ -39,11 +41,11 @@ func (fakeCMLister *FakeConfigMapLister) ConfigMaps(ns string) corelisterv1.Conf
 	return fakeCMLister
 }
 
-func (fakeCMLister *FakeConfigMapLister) List(selector labels.Selector) ([]*corev1.ConfigMap, error) {
+func (fakeCMLister *FakeConfigMapLister) List(ctx context.Context, selector labels.Selector) ([]*corev1.ConfigMap, error) {
 	return nil, nil
 }
 
-func (fakeCMLister *FakeConfigMapLister) Get(cm string) (*corev1.ConfigMap, error) {
+func (fakeCMLister *FakeConfigMapLister) Get(ctx context.Context, cm string) (*corev1.ConfigMap, error) {
 	return nil, errors.NewNotFound(schema.GroupResource{}, "")
 }
 
@@ -284,7 +286,7 @@ func TestObserveCloudProviderNames(t *testing.T) {
 				ConfigMapLister_:      &FakeConfigMapLister{},
 			}
 			observerFunc := NewCloudProviderObserver("kube-controller-manager", c.skipCloudProviderExternal)
-			result, errs := observerFunc(listers, events.NewInMemoryRecorder("cloud", clocktesting.NewFakePassiveClock(time.Now())), map[string]interface{}{
+			result, errs := observerFunc(t.Context(), listers, events.NewInMemoryRecorder("cloud", clocktesting.NewFakePassiveClock(time.Now())), map[string]interface{}{
 				"extendedArguments": map[string]interface{}{
 					"cloud-provider": []interface{}{"previous"}, // This should be overwritten by whatever the observer sets.
 					"additional":     []interface{}{"value"},    // This should be pruned.

@@ -13,6 +13,9 @@ import (
 	"github.com/openshift/library-go/pkg/operator/management"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -82,7 +85,7 @@ func NewRevisionController(
 	}
 
 	return factory.New().
-		WithInformers(
+		WithInformersQueueKeyFunc(v1helpers.ObjToString,
 			operatorClient.Informer(),
 			kubeInformersForTargetNamespace.Core().V1().ConfigMaps().Informer(),
 			kubeInformersForTargetNamespace.Core().V1().Secrets().Informer(),
@@ -357,12 +360,18 @@ func (c RevisionController) getLatestAvailableRevision(ctx context.Context) (int
 }
 
 func (c RevisionController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	operatorSpec, operatorStatus, _, err := c.operatorClient.GetOperatorState()
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "ckao.RevisionController", trace.WithAttributes(
+		attribute.String("aaaQueueKey", syncCtx.QueueKey()),
+	))
+	defer span.End()
+
+	operatorSpec, operatorStatus, _, err := c.operatorClient.GetOperatorState(ctx)
 	if err != nil {
 		return err
 	}
 
-	if !management.IsOperatorManaged(operatorSpec.ManagementState) {
+	if !management.IsOperatorManaged(ctx, operatorSpec.ManagementState) {
 		return nil
 	}
 
