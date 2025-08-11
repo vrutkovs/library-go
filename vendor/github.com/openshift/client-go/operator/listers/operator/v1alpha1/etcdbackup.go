@@ -3,6 +3,8 @@
 package v1alpha1
 
 import (
+	"context"
+
 	operatorv1alpha1 "github.com/openshift/api/operator/v1alpha1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
@@ -14,10 +16,10 @@ import (
 type EtcdBackupLister interface {
 	// List lists all EtcdBackups in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*operatorv1alpha1.EtcdBackup, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*operatorv1alpha1.EtcdBackup, err error)
 	// Get retrieves the EtcdBackup from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*operatorv1alpha1.EtcdBackup, error)
+	Get(ctx context.Context, name string) (*operatorv1alpha1.EtcdBackup, error)
 	EtcdBackupListerExpansion
 }
 

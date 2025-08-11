@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/api/admissionregistration/v1"
+	v1 "k8s.io/api/admissionregistration/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -134,7 +134,7 @@ func (d *policyDispatcher[P, B, E]) Dispatch(ctx context.Context, a admission.At
 
 	for _, hook := range hooks {
 		policyAccessor := d.newPolicyAccessor(hook.Policy)
-		matches, matchGVR, matchGVK, err := d.matcher.DefinitionMatches(a, o, policyAccessor)
+		matches, matchGVR, matchGVK, err := d.matcher.DefinitionMatches(ctx, a, o, policyAccessor)
 		if err != nil {
 			// There was an error evaluating if this policy matches anything.
 			addConfigError(err, policyAccessor, nil)
@@ -148,7 +148,7 @@ func (d *policyDispatcher[P, B, E]) Dispatch(ctx context.Context, a admission.At
 
 		for _, binding := range hook.Bindings {
 			bindingAccessor := d.newBindingAccessor(binding)
-			matches, err = d.matcher.BindingMatches(a, o, bindingAccessor)
+			matches, err = d.matcher.BindingMatches(ctx, a, o, bindingAccessor)
 			if err != nil {
 				// There was an error evaluating if this binding matches anything.
 				addConfigError(err, policyAccessor, bindingAccessor)
@@ -169,6 +169,7 @@ func (d *policyDispatcher[P, B, E]) Dispatch(ctx context.Context, a admission.At
 
 			// Collect params for this binding
 			params, err := CollectParams(
+				ctx,
 				policyAccessor.GetParamKind(),
 				hook.ParamInformer,
 				hook.ParamScope,
@@ -265,6 +266,7 @@ func (d *policyDispatcher[P, B, E]) Dispatch(ctx context.Context, a admission.At
 // configuration. If the policy-binding has no param configuration, it
 // returns a single-element list with a nil param.
 func CollectParams(
+	ctx context.Context,
 	paramKind *v1.ParamKind,
 	paramInformer informers.GenericInformer,
 	paramScope meta.RESTScope,
@@ -296,7 +298,7 @@ func CollectParams(
 				return nil, fmt.Errorf("cannot use namespaced paramRef in policy binding that matches cluster-scoped resources")
 			}
 
-			paramStore = paramInformer.Lister().ByNamespace(paramsNamespace)
+			paramStore = paramInformer.Lister().ByNamespace(ctx, paramsNamespace)
 		}
 
 		// If the param informer for this admission policy has not yet
@@ -331,7 +333,7 @@ func CollectParams(
 			return nil, fmt.Errorf("paramRef.name and paramRef.selector are mutually exclusive")
 		}
 
-		switch param, err := paramStore.Get(paramRef.Name); {
+		switch param, err := paramStore.Get(ctx, paramRef.Name); {
 		case err == nil:
 			params = []runtime.Object{param}
 		case apierrors.IsNotFound(err):
@@ -359,7 +361,7 @@ func CollectParams(
 
 		}
 
-		paramList, err := paramStore.List(selector)
+		paramList, err := paramStore.List(ctx, selector)
 		if err != nil {
 			// There was a bad internal error
 			utilruntime.HandleError(err)

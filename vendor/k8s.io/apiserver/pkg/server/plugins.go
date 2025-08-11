@@ -18,6 +18,8 @@ package server
 
 // This file exists to force the desired plugin implementations to be linked into genericapi pkg.
 import (
+	"context"
+
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle"
 	mutatingadmissionpolicy "k8s.io/apiserver/pkg/admission/plugin/policy/mutating"
@@ -27,10 +29,10 @@ import (
 )
 
 // RegisterAllAdmissionPlugins registers all admission plugins
-func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
+func RegisterAllAdmissionPlugins(ctx context.Context, plugins *admission.Plugins) {
 	lifecycle.Register(plugins)
-	validatingwebhook.Register(plugins)
-	mutatingwebhook.Register(plugins)
+	validatingwebhook.Register(ctx, plugins)
+	mutatingwebhook.Register(ctx, plugins)
 	validatingadmissionpolicy.Register(plugins)
 	mutatingadmissionpolicy.Register(plugins)
 }

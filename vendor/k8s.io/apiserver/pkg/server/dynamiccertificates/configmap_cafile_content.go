@@ -142,8 +142,8 @@ func (c *ConfigMapCAController) AddListener(listener Listener) {
 }
 
 // loadCABundle determines the next set of content for the file.
-func (c *ConfigMapCAController) loadCABundle() error {
-	configMap, err := c.configmapLister.ConfigMaps(c.configmapNamespace).Get(c.configmapName)
+func (c *ConfigMapCAController) loadCABundle(ctx context.Context) error {
+	configMap, err := c.configmapLister.ConfigMaps(c.configmapNamespace).Get(ctx, c.configmapName)
 	if err != nil {
 		return err
 	}
@@ -193,7 +193,7 @@ func (c *ConfigMapCAController) hasCAChanged(caBundle []byte) bool {
 func (c *ConfigMapCAController) RunOnce(ctx context.Context) error {
 	// Ignore the error when running once because when using a dynamically loaded ca file, because we think it's better to have nothing for
 	// a brief time than completely crash.  If crashing is necessary, higher order logic like a healthcheck and cause failures.
-	_ = c.loadCABundle()
+	_ = c.loadCABundle(ctx)
 	return nil
 }
 
@@ -214,7 +214,7 @@ func (c *ConfigMapCAController) Run(ctx context.Context, workers int) {
 	}
 
 	// doesn't matter what workers say, only start one.
-	go wait.Until(c.runWorker, time.Second, ctx.Done())
+	go wait.UntilWithContext(ctx, c.runWorker, time.Second)
 
 	// start timer that rechecks every minute, just in case.  this also serves to prime the controller quickly.
 	go wait.PollImmediateUntil(FileRefreshDuration, func() (bool, error) {
@@ -225,19 +225,19 @@ func (c *ConfigMapCAController) Run(ctx context.Context, workers int) {
 	<-ctx.Done()
 }
 
-func (c *ConfigMapCAController) runWorker() {
-	for c.processNextWorkItem() {
+func (c *ConfigMapCAController) runWorker(ctx context.Context) {
+	for c.processNextWorkItem(ctx) {
 	}
 }
 
-func (c *ConfigMapCAController) processNextWorkItem() bool {
+func (c *ConfigMapCAController) processNextWorkItem(ctx context.Context) bool {
 	dsKey, quit := c.queue.Get()
 	if quit {
 		return false
 	}
 	defer c.queue.Done(dsKey)
 
-	err := c.loadCABundle()
+	err := c.loadCABundle(ctx)
 	if err == nil {
 		c.queue.Forget(dsKey)
 		return true

@@ -7,6 +7,7 @@ import (
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
+	"context"
 )
 
 // ClusterVersionLister helps list ClusterVersions.
@@ -14,10 +15,10 @@ import (
 type ClusterVersionLister interface {
 	// List lists all ClusterVersions in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*configv1.ClusterVersion, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*configv1.ClusterVersion, err error)
 	// Get retrieves the ClusterVersion from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*configv1.ClusterVersion, error)
+	Get(ctx context.Context, name string) (*configv1.ClusterVersion, error)
 	ClusterVersionListerExpansion
 }
 

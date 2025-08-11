@@ -7,6 +7,7 @@ import (
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
+	"context"
 )
 
 // ImageLister helps list Images.
@@ -14,10 +15,10 @@ import (
 type ImageLister interface {
 	// List lists all Images in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*configv1.Image, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*configv1.Image, err error)
 	// Get retrieves the Image from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*configv1.Image, error)
+	Get(ctx context.Context, name string) (*configv1.Image, error)
 	ImageListerExpansion
 }
 

@@ -356,10 +356,10 @@ func (p *PolicyTestContext[P, B, E]) WaitForReconcile(timeoutCtx context.Context
 
 			var lister cache.GenericNamespaceLister = informer.Lister()
 			if scope == meta.RESTScopeNamespace {
-				lister = informer.Lister().ByNamespace(objectMeta.GetNamespace())
+				lister = informer.Lister().ByNamespace(ctx, objectMeta.GetNamespace())
 			}
 
-			fetched, err := lister.Get(objectMeta.GetName())
+			fetched, err := lister.Get(ctx, objectMeta.GetName())
 			if err != nil {
 				if errors.IsNotFound(err) {
 					return false, nil
@@ -414,10 +414,10 @@ func (p *PolicyTestContext[P, B, E]) waitForDelete(ctx context.Context, objectGV
 
 			var lister cache.GenericNamespaceLister = informer.Lister()
 			if scope == meta.RESTScopeNamespace {
-				lister = informer.Lister().ByNamespace(name.Namespace)
+				lister = informer.Lister().ByNamespace(ctx, name.Namespace)
 			}
 
-			_, err = lister.Get(name.Name)
+			_, err = lister.Get(ctx, name.Name)
 			if err != nil {
 				if errors.IsNotFound(err) {
 					return true, nil

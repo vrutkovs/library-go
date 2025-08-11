@@ -23,6 +23,7 @@ import (
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
+	"context"
 )
 
 // ResourceQuotaLister helps list ResourceQuotas.
@@ -30,7 +31,7 @@ import (
 type ResourceQuotaLister interface {
 	// List lists all ResourceQuotas in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*corev1.ResourceQuota, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*corev1.ResourceQuota, err error)
 	// ResourceQuotas returns an object that can list and get ResourceQuotas.
 	ResourceQuotas(namespace string) ResourceQuotaNamespaceLister
 	ResourceQuotaListerExpansion
@@ -56,10 +57,10 @@ func (s *resourceQuotaLister) ResourceQuotas(namespace string) ResourceQuotaName
 type ResourceQuotaNamespaceLister interface {
 	// List lists all ResourceQuotas in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*corev1.ResourceQuota, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*corev1.ResourceQuota, err error)
 	// Get retrieves the ResourceQuota from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*corev1.ResourceQuota, error)
+	Get(ctx context.Context, name string) (*corev1.ResourceQuota, error)
 	ResourceQuotaNamespaceListerExpansion
 }
 

@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	flowcontrolv1 "k8s.io/api/flowcontrol/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
@@ -30,10 +31,10 @@ import (
 type FlowSchemaLister interface {
 	// List lists all FlowSchemas in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*flowcontrolv1.FlowSchema, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*flowcontrolv1.FlowSchema, err error)
 	// Get retrieves the FlowSchema from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*flowcontrolv1.FlowSchema, error)
+	Get(ctx context.Context, name string) (*flowcontrolv1.FlowSchema, error)
 	FlowSchemaListerExpansion
 }
 

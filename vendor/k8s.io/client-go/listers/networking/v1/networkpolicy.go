@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	networkingv1 "k8s.io/api/networking/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
@@ -30,7 +31,7 @@ import (
 type NetworkPolicyLister interface {
 	// List lists all NetworkPolicies in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*networkingv1.NetworkPolicy, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*networkingv1.NetworkPolicy, err error)
 	// NetworkPolicies returns an object that can list and get NetworkPolicies.
 	NetworkPolicies(namespace string) NetworkPolicyNamespaceLister
 	NetworkPolicyListerExpansion
@@ -56,10 +57,10 @@ func (s *networkPolicyLister) NetworkPolicies(namespace string) NetworkPolicyNam
 type NetworkPolicyNamespaceLister interface {
 	// List lists all NetworkPolicies in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*networkingv1.NetworkPolicy, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*networkingv1.NetworkPolicy, err error)
 	// Get retrieves the NetworkPolicy from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*networkingv1.NetworkPolicy, error)
+	Get(ctx context.Context, name string) (*networkingv1.NetworkPolicy, error)
 	NetworkPolicyNamespaceListerExpansion
 }
 

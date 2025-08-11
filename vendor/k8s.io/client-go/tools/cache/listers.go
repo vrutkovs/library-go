@@ -17,6 +17,8 @@ limitations under the License.
 package cache
 
 import (
+	"context"
+
 	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -25,6 +27,10 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // AppendFunc is used to add a matching item to whatever list the caller is using
@@ -104,19 +110,19 @@ func ListAllByNamespace(indexer Indexer, namespace string, selector labels.Selec
 // GenericLister is a lister skin on a generic Indexer
 type GenericLister interface {
 	// List will return all objects across namespaces
-	List(selector labels.Selector) (ret []runtime.Object, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []runtime.Object, err error)
 	// Get will attempt to retrieve assuming that name==key
-	Get(name string) (runtime.Object, error)
+	Get(ctx context.Context, name string) (runtime.Object, error)
 	// ByNamespace will give you a GenericNamespaceLister for one namespace
-	ByNamespace(namespace string) GenericNamespaceLister
+	ByNamespace(ctx context.Context, namespace string) GenericNamespaceLister
 }
 
 // GenericNamespaceLister is a lister skin on a generic Indexer
 type GenericNamespaceLister interface {
 	// List will return all objects in this namespace
-	List(selector labels.Selector) (ret []runtime.Object, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []runtime.Object, err error)
 	// Get will attempt to retrieve by namespace and name
-	Get(name string) (runtime.Object, error)
+	Get(ctx context.Context, name string) (runtime.Object, error)
 }
 
 // NewGenericLister creates a new instance for the genericLister.
@@ -129,18 +135,34 @@ type genericLister struct {
 	resource schema.GroupResource
 }
 
-func (s *genericLister) List(selector labels.Selector) (ret []runtime.Object, err error) {
+func (s *genericLister) List(ctx context.Context, selector labels.Selector) (ret []runtime.Object, err error) {
+	tracer := otel.GetTracerProvider().Tracer("client-go")
+	ctx, span := tracer.Start(ctx, "genericLister.List", trace.WithAttributes(
+		attribute.String("selector", selector.String()),
+	))
+	defer span.End()
 	err = ListAll(s.indexer, selector, func(m interface{}) {
 		ret = append(ret, m.(runtime.Object))
 	})
 	return ret, err
 }
 
-func (s *genericLister) ByNamespace(namespace string) GenericNamespaceLister {
+func (s *genericLister) ByNamespace(ctx context.Context, namespace string) GenericNamespaceLister {
+	tracer := otel.GetTracerProvider().Tracer("client-go")
+	ctx, span := tracer.Start(ctx, "genericLister.ByNamespace", trace.WithAttributes(
+		attribute.String("name", namespace),
+	))
+	defer span.End()
 	return &genericNamespaceLister{indexer: s.indexer, namespace: namespace, resource: s.resource}
 }
 
-func (s *genericLister) Get(name string) (runtime.Object, error) {
+func (s *genericLister) Get(ctx context.Context, name string) (runtime.Object, error) {
+	tracer := otel.GetTracerProvider().Tracer("client-go")
+	ctx, span := tracer.Start(ctx, "genericLister.Get", trace.WithAttributes(
+		attribute.String("name", name),
+	))
+	defer span.End()
+
 	obj, exists, err := s.indexer.GetByKey(name)
 	if err != nil {
 		return nil, err
@@ -157,14 +179,25 @@ type genericNamespaceLister struct {
 	resource  schema.GroupResource
 }
 
-func (s *genericNamespaceLister) List(selector labels.Selector) (ret []runtime.Object, err error) {
+func (s *genericNamespaceLister) List(ctx context.Context, selector labels.Selector) (ret []runtime.Object, err error) {
+	tracer := otel.GetTracerProvider().Tracer("client-go")
+	ctx, span := tracer.Start(ctx, "genericNamespaceLister.List", trace.WithAttributes(
+		attribute.String("name", selector.String()),
+	))
+	defer span.End()
 	err = ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
 		ret = append(ret, m.(runtime.Object))
 	})
 	return ret, err
 }
 
-func (s *genericNamespaceLister) Get(name string) (runtime.Object, error) {
+func (s *genericNamespaceLister) Get(ctx context.Context, name string) (runtime.Object, error) {
+	tracer := otel.GetTracerProvider().Tracer("client-go")
+	ctx, span := tracer.Start(ctx, "genericNamespaceLister.Get", trace.WithAttributes(
+		attribute.String("name", name),
+	))
+	defer span.End()
+
 	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
 	if err != nil {
 		return nil, err

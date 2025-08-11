@@ -17,6 +17,7 @@ limitations under the License.
 package configuration
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"sync"
@@ -50,7 +51,7 @@ type mutatingWebhookConfigurationManager struct {
 
 var _ generic.Source = &mutatingWebhookConfigurationManager{}
 
-func NewMutatingWebhookConfigurationManager(f informers.SharedInformerFactory) generic.Source {
+func NewMutatingWebhookConfigurationManager(ctx context.Context, f informers.SharedInformerFactory) generic.Source {
 	informer := f.Admissionregistration().V1().MutatingWebhookConfigurations()
 	manager := &mutatingWebhookConfigurationManager{
 		lister:                        informer.Lister(),
@@ -59,11 +60,11 @@ func NewMutatingWebhookConfigurationManager(f informers.SharedInformerFactory) g
 	manager.lazy.Evaluate = manager.getConfiguration
 
 	handle, _ := informer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(_ interface{}) { manager.lazy.Notify() },
+		AddFunc: func(_ interface{}) { manager.lazy.Notify(ctx) },
 		UpdateFunc: func(old, new interface{}) {
 			obj := new.(*v1.MutatingWebhookConfiguration)
 			manager.configurationsCache.Delete(obj.GetName())
-			manager.lazy.Notify()
+			manager.lazy.Notify(ctx)
 		},
 		DeleteFunc: func(obj interface{}) {
 			vwc, ok := obj.(*v1.MutatingWebhookConfiguration)
@@ -80,7 +81,7 @@ func NewMutatingWebhookConfigurationManager(f informers.SharedInformerFactory) g
 				}
 			}
 			manager.configurationsCache.Delete(vwc.Name)
-			manager.lazy.Notify()
+			manager.lazy.Notify(ctx)
 		},
 	})
 	manager.hasSynced = handle.HasSynced
@@ -89,8 +90,8 @@ func NewMutatingWebhookConfigurationManager(f informers.SharedInformerFactory) g
 }
 
 // Webhooks returns the merged MutatingWebhookConfiguration.
-func (m *mutatingWebhookConfigurationManager) Webhooks() []webhook.WebhookAccessor {
-	out, err := m.lazy.Get()
+func (m *mutatingWebhookConfigurationManager) Webhooks(ctx context.Context) []webhook.WebhookAccessor {
+	out, err := m.lazy.Get(ctx)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("error getting webhook configuration: %v", err))
 	}
@@ -101,8 +102,8 @@ func (m *mutatingWebhookConfigurationManager) Webhooks() []webhook.WebhookAccess
 // has been loaded.
 func (m *mutatingWebhookConfigurationManager) HasSynced() bool { return m.hasSynced() }
 
-func (m *mutatingWebhookConfigurationManager) getConfiguration() ([]webhook.WebhookAccessor, error) {
-	configurations, err := m.lister.List(labels.Everything())
+func (m *mutatingWebhookConfigurationManager) getConfiguration(ctx context.Context) ([]webhook.WebhookAccessor, error) {
+	configurations, err := m.lister.List(ctx, labels.Everything())
 	if err != nil {
 		return []webhook.WebhookAccessor{}, err
 	}

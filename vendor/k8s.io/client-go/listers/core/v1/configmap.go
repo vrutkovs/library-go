@@ -23,6 +23,7 @@ import (
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
+	"context"
 )
 
 // ConfigMapLister helps list ConfigMaps.
@@ -30,7 +31,7 @@ import (
 type ConfigMapLister interface {
 	// List lists all ConfigMaps in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*corev1.ConfigMap, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*corev1.ConfigMap, err error)
 	// ConfigMaps returns an object that can list and get ConfigMaps.
 	ConfigMaps(namespace string) ConfigMapNamespaceLister
 	ConfigMapListerExpansion
@@ -56,10 +57,10 @@ func (s *configMapLister) ConfigMaps(namespace string) ConfigMapNamespaceLister 
 type ConfigMapNamespaceLister interface {
 	// List lists all ConfigMaps in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*corev1.ConfigMap, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*corev1.ConfigMap, err error)
 	// Get retrieves the ConfigMap from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*corev1.ConfigMap, error)
+	Get(ctx context.Context, name string) (*corev1.ConfigMap, error)
 	ConfigMapNamespaceListerExpansion
 }
 

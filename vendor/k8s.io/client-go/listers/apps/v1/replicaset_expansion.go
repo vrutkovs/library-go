@@ -17,10 +17,11 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	"fmt"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -43,7 +44,7 @@ func (s *replicaSetLister) GetPodReplicaSets(pod *v1.Pod) ([]*apps.ReplicaSet, e
 		return nil, fmt.Errorf("no ReplicaSets found for pod %v because it has no labels", pod.Name)
 	}
 
-	list, err := s.ReplicaSets(pod.Namespace).List(labels.Everything())
+	list, err := s.ReplicaSets(pod.Namespace).List(context.Background(), labels.Everything())
 	if err != nil {
 		return nil, err
 	}

@@ -23,6 +23,7 @@ import (
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
+	"context"
 )
 
 // CSIDriverLister helps list CSIDrivers.
@@ -30,10 +31,10 @@ import (
 type CSIDriverLister interface {
 	// List lists all CSIDrivers in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*storagev1beta1.CSIDriver, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*storagev1beta1.CSIDriver, err error)
 	// Get retrieves the CSIDriver from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*storagev1beta1.CSIDriver, error)
+	Get(ctx context.Context, name string) (*storagev1beta1.CSIDriver, error)
 	CSIDriverListerExpansion
 }
 

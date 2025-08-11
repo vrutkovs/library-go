@@ -23,6 +23,7 @@ import (
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
+	"context"
 )
 
 // StatefulSetLister helps list StatefulSets.
@@ -30,7 +31,7 @@ import (
 type StatefulSetLister interface {
 	// List lists all StatefulSets in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*appsv1beta2.StatefulSet, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*appsv1beta2.StatefulSet, err error)
 	// StatefulSets returns an object that can list and get StatefulSets.
 	StatefulSets(namespace string) StatefulSetNamespaceLister
 	StatefulSetListerExpansion
@@ -56,10 +57,10 @@ func (s *statefulSetLister) StatefulSets(namespace string) StatefulSetNamespaceL
 type StatefulSetNamespaceLister interface {
 	// List lists all StatefulSets in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*appsv1beta2.StatefulSet, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*appsv1beta2.StatefulSet, err error)
 	// Get retrieves the StatefulSet from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*appsv1beta2.StatefulSet, error)
+	Get(ctx context.Context, name string) (*appsv1beta2.StatefulSet, error)
 	StatefulSetNamespaceListerExpansion
 }
 

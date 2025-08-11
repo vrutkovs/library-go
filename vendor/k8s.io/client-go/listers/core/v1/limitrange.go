@@ -23,6 +23,7 @@ import (
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
+	"context"
 )
 
 // LimitRangeLister helps list LimitRanges.
@@ -30,7 +31,7 @@ import (
 type LimitRangeLister interface {
 	// List lists all LimitRanges in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*corev1.LimitRange, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*corev1.LimitRange, err error)
 	// LimitRanges returns an object that can list and get LimitRanges.
 	LimitRanges(namespace string) LimitRangeNamespaceLister
 	LimitRangeListerExpansion
@@ -56,10 +57,10 @@ func (s *limitRangeLister) LimitRanges(namespace string) LimitRangeNamespaceList
 type LimitRangeNamespaceLister interface {
 	// List lists all LimitRanges in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*corev1.LimitRange, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*corev1.LimitRange, err error)
 	// Get retrieves the LimitRange from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*corev1.LimitRange, error)
+	Get(ctx context.Context, name string) (*corev1.LimitRange, error)
 	LimitRangeNamespaceListerExpansion
 }
 

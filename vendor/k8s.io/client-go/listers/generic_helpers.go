@@ -17,11 +17,17 @@ limitations under the License.
 package listers
 
 import (
+	"context"
+	"fmt"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
+
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // ResourceIndexer wraps an indexer, resource, and optional namespace for a given type.
@@ -45,7 +51,7 @@ func NewNamespaced[T runtime.Object](parent ResourceIndexer[T], namespace string
 }
 
 // List lists all resources in the indexer matching the given selector.
-func (l ResourceIndexer[T]) List(selector labels.Selector) (ret []T, err error) {
+func (l ResourceIndexer[T]) List(ctx context.Context, selector labels.Selector) (ret []T, err error) {
 	// ListAllByNamespace reverts to ListAll on empty namespaces
 	err = cache.ListAllByNamespace(l.indexer, l.namespace, selector, func(m interface{}) {
 		ret = append(ret, m.(T))
@@ -54,7 +60,13 @@ func (l ResourceIndexer[T]) List(selector labels.Selector) (ret []T, err error) 
 }
 
 // Get retrieves the resource from the index for a given name.
-func (l ResourceIndexer[T]) Get(name string) (T, error) {
+func (l ResourceIndexer[T]) Get(ctx context.Context, name string) (T, error) {
+	tracer := trace.SpanFromContext(ctx).TracerProvider().Tracer("client-go")
+	ctx, span := tracer.Start(ctx, fmt.Sprintf("lister.%s/%s.Get", l.resource.Group, l.resource.Resource), trace.WithAttributes(
+		attribute.String("namespace", l.namespace),
+		attribute.String("name", name),
+	))
+	defer span.End()
 	var key string
 	if l.namespace == "" {
 		key = name

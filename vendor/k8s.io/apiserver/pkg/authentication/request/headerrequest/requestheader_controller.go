@@ -188,7 +188,7 @@ func (c *RequestHeaderAuthRequestController) Run(ctx context.Context, workers in
 	}
 
 	// doesn't matter what workers say, only start one.
-	go wait.Until(c.runWorker, time.Second, ctx.Done())
+	go wait.UntilWithContext(ctx, c.runWorker, time.Second)
 
 	<-ctx.Done()
 }
@@ -211,19 +211,19 @@ func (c *RequestHeaderAuthRequestController) RunOnce(ctx context.Context) error 
 	return c.syncConfigMap(configMap)
 }
 
-func (c *RequestHeaderAuthRequestController) runWorker() {
-	for c.processNextWorkItem() {
+func (c *RequestHeaderAuthRequestController) runWorker(ctx context.Context) {
+	for c.processNextWorkItem(ctx) {
 	}
 }
 
-func (c *RequestHeaderAuthRequestController) processNextWorkItem() bool {
+func (c *RequestHeaderAuthRequestController) processNextWorkItem(ctx context.Context) bool {
 	dsKey, quit := c.queue.Get()
 	if quit {
 		return false
 	}
 	defer c.queue.Done(dsKey)
 
-	err := c.sync()
+	err := c.sync(ctx)
 	if err == nil {
 		c.queue.Forget(dsKey)
 		return true
@@ -237,8 +237,8 @@ func (c *RequestHeaderAuthRequestController) processNextWorkItem() bool {
 
 // sync reads the config and propagates the changes to exportedRequestHeaderBundle
 // which is exposed by the set of methods that are used to fill RequestHeaderConfig struct
-func (c *RequestHeaderAuthRequestController) sync() error {
-	configMap, err := c.configmapLister.Get(c.configmapName)
+func (c *RequestHeaderAuthRequestController) sync(ctx context.Context) error {
+	configMap, err := c.configmapLister.Get(ctx, c.configmapName)
 	if err != nil {
 		return err
 	}

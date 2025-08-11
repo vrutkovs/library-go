@@ -19,6 +19,7 @@ limitations under the License.
 package v1beta2
 
 import (
+	"context"
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
@@ -30,10 +31,10 @@ import (
 type DeviceClassLister interface {
 	// List lists all DeviceClasses in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*resourcev1beta2.DeviceClass, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*resourcev1beta2.DeviceClass, err error)
 	// Get retrieves the DeviceClass from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*resourcev1beta2.DeviceClass, error)
+	Get(ctx context.Context, name string) (*resourcev1beta2.DeviceClass, error)
 	DeviceClassListerExpansion
 }
 

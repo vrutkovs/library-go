@@ -23,6 +23,7 @@ import (
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
+	"context"
 )
 
 // IPAddressLister helps list IPAddresses.
@@ -30,10 +31,10 @@ import (
 type IPAddressLister interface {
 	// List lists all IPAddresses in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*networkingv1alpha1.IPAddress, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*networkingv1alpha1.IPAddress, err error)
 	// Get retrieves the IPAddress from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*networkingv1alpha1.IPAddress, error)
+	Get(ctx context.Context, name string) (*networkingv1alpha1.IPAddress, error)
 	IPAddressListerExpansion
 }
 

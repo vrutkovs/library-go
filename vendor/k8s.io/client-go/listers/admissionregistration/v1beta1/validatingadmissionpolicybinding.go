@@ -23,6 +23,7 @@ import (
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
+	"context"
 )
 
 // ValidatingAdmissionPolicyBindingLister helps list ValidatingAdmissionPolicyBindings.
@@ -30,10 +31,10 @@ import (
 type ValidatingAdmissionPolicyBindingLister interface {
 	// List lists all ValidatingAdmissionPolicyBindings in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*admissionregistrationv1beta1.ValidatingAdmissionPolicyBinding, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*admissionregistrationv1beta1.ValidatingAdmissionPolicyBinding, err error)
 	// Get retrieves the ValidatingAdmissionPolicyBinding from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*admissionregistrationv1beta1.ValidatingAdmissionPolicyBinding, error)
+	Get(ctx context.Context, name string) (*admissionregistrationv1beta1.ValidatingAdmissionPolicyBinding, error)
 	ValidatingAdmissionPolicyBindingListerExpansion
 }
 

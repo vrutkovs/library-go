@@ -23,6 +23,7 @@ import (
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
+	"context"
 )
 
 // CSINodeLister helps list CSINodes.
@@ -30,10 +31,10 @@ import (
 type CSINodeLister interface {
 	// List lists all CSINodes in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*storagev1.CSINode, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*storagev1.CSINode, err error)
 	// Get retrieves the CSINode from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*storagev1.CSINode, error)
+	Get(ctx context.Context, name string) (*storagev1.CSINode, error)
 	CSINodeListerExpansion
 }
 

@@ -23,6 +23,7 @@ import (
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
+	"context"
 )
 
 // EndpointSliceLister helps list EndpointSlices.
@@ -30,7 +31,7 @@ import (
 type EndpointSliceLister interface {
 	// List lists all EndpointSlices in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*discoveryv1beta1.EndpointSlice, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*discoveryv1beta1.EndpointSlice, err error)
 	// EndpointSlices returns an object that can list and get EndpointSlices.
 	EndpointSlices(namespace string) EndpointSliceNamespaceLister
 	EndpointSliceListerExpansion
@@ -56,10 +57,10 @@ func (s *endpointSliceLister) EndpointSlices(namespace string) EndpointSliceName
 type EndpointSliceNamespaceLister interface {
 	// List lists all EndpointSlices in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*discoveryv1beta1.EndpointSlice, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*discoveryv1beta1.EndpointSlice, err error)
 	// Get retrieves the EndpointSlice from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*discoveryv1beta1.EndpointSlice, error)
+	Get(ctx context.Context, name string) (*discoveryv1beta1.EndpointSlice, error)
 	EndpointSliceNamespaceListerExpansion
 }
 

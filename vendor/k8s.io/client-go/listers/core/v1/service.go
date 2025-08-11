@@ -23,6 +23,7 @@ import (
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
+	"context"
 )
 
 // ServiceLister helps list Services.
@@ -30,7 +31,7 @@ import (
 type ServiceLister interface {
 	// List lists all Services in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*corev1.Service, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*corev1.Service, err error)
 	// Services returns an object that can list and get Services.
 	Services(namespace string) ServiceNamespaceLister
 	ServiceListerExpansion
@@ -56,10 +57,10 @@ func (s *serviceLister) Services(namespace string) ServiceNamespaceLister {
 type ServiceNamespaceLister interface {
 	// List lists all Services in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*corev1.Service, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*corev1.Service, err error)
 	// Get retrieves the Service from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*corev1.Service, error)
+	Get(ctx context.Context, name string) (*corev1.Service, error)
 	ServiceNamespaceListerExpansion
 }
 

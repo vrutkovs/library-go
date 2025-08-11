@@ -3,6 +3,8 @@
 package v1
 
 import (
+	"context"
+
 	operatorv1 "github.com/openshift/api/operator/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
@@ -14,10 +16,10 @@ import (
 type MachineConfigurationLister interface {
 	// List lists all MachineConfigurations in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*operatorv1.MachineConfiguration, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*operatorv1.MachineConfiguration, err error)
 	// Get retrieves the MachineConfiguration from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*operatorv1.MachineConfiguration, error)
+	Get(ctx context.Context, name string) (*operatorv1.MachineConfiguration, error)
 	MachineConfigurationListerExpansion
 }
 

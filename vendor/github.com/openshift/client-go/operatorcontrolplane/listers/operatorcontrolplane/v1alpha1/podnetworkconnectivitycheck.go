@@ -3,6 +3,8 @@
 package v1alpha1
 
 import (
+	"context"
+
 	operatorcontrolplanev1alpha1 "github.com/openshift/api/operatorcontrolplane/v1alpha1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
@@ -14,7 +16,7 @@ import (
 type PodNetworkConnectivityCheckLister interface {
 	// List lists all PodNetworkConnectivityChecks in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*operatorcontrolplanev1alpha1.PodNetworkConnectivityCheck, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*operatorcontrolplanev1alpha1.PodNetworkConnectivityCheck, err error)
 	// PodNetworkConnectivityChecks returns an object that can list and get PodNetworkConnectivityChecks.
 	PodNetworkConnectivityChecks(namespace string) PodNetworkConnectivityCheckNamespaceLister
 	PodNetworkConnectivityCheckListerExpansion
@@ -40,10 +42,10 @@ func (s *podNetworkConnectivityCheckLister) PodNetworkConnectivityChecks(namespa
 type PodNetworkConnectivityCheckNamespaceLister interface {
 	// List lists all PodNetworkConnectivityChecks in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*operatorcontrolplanev1alpha1.PodNetworkConnectivityCheck, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*operatorcontrolplanev1alpha1.PodNetworkConnectivityCheck, err error)
 	// Get retrieves the PodNetworkConnectivityCheck from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*operatorcontrolplanev1alpha1.PodNetworkConnectivityCheck, error)
+	Get(ctx context.Context, name string) (*operatorcontrolplanev1alpha1.PodNetworkConnectivityCheck, error)
 	PodNetworkConnectivityCheckNamespaceListerExpansion
 }
 

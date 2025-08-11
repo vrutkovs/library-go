@@ -44,8 +44,8 @@ type Matcher struct {
 	Client          clientset.Interface
 }
 
-func (m *Matcher) GetNamespace(name string) (*v1.Namespace, error) {
-	return m.NamespaceLister.Get(name)
+func (m *Matcher) GetNamespace(ctx context.Context, name string) (*v1.Namespace, error) {
+	return m.NamespaceLister.Get(ctx, name)
 }
 
 // Validate checks if the Matcher has a NamespaceLister and Client.
@@ -61,7 +61,7 @@ func (m *Matcher) Validate() error {
 }
 
 // GetNamespaceLabels gets the labels of the namespace related to the attr.
-func (m *Matcher) GetNamespaceLabels(attr admission.Attributes) (map[string]string, error) {
+func (m *Matcher) GetNamespaceLabels(ctx context.Context, attr admission.Attributes) (map[string]string, error) {
 	// If the request itself is creating or updating a namespace, then get the
 	// labels from attr.Object, because namespaceLister doesn't have the latest
 	// namespace yet.
@@ -81,7 +81,7 @@ func (m *Matcher) GetNamespaceLabels(attr admission.Attributes) (map[string]stri
 	}
 
 	namespaceName := attr.GetNamespace()
-	namespace, err := m.NamespaceLister.Get(namespaceName)
+	namespace, err := m.NamespaceLister.Get(ctx, namespaceName)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, err
 	}
@@ -97,7 +97,7 @@ func (m *Matcher) GetNamespaceLabels(attr admission.Attributes) (map[string]stri
 
 // MatchNamespaceSelector decideds whether the request matches the
 // namespaceSelctor of the webhook. Only when they match, the webhook is called.
-func (m *Matcher) MatchNamespaceSelector(p NamespaceSelectorProvider, attr admission.Attributes) (bool, *apierrors.StatusError) {
+func (m *Matcher) MatchNamespaceSelector(ctx context.Context, p NamespaceSelectorProvider, attr admission.Attributes) (bool, *apierrors.StatusError) {
 	namespaceName := attr.GetNamespace()
 	if len(namespaceName) == 0 && attr.GetResource().Resource != "namespaces" {
 		// If the request is about a cluster scoped resource, and it is not a
@@ -114,7 +114,7 @@ func (m *Matcher) MatchNamespaceSelector(p NamespaceSelectorProvider, attr admis
 		return true, nil
 	}
 
-	namespaceLabels, err := m.GetNamespaceLabels(attr)
+	namespaceLabels, err := m.GetNamespaceLabels(ctx, attr)
 	// this means the namespace is not found, for backwards compatibility,
 	// return a 404
 	if apierrors.IsNotFound(err) {

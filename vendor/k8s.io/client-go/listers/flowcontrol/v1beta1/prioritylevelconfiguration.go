@@ -19,6 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	"context"
 	flowcontrolv1beta1 "k8s.io/api/flowcontrol/v1beta1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
@@ -30,10 +31,10 @@ import (
 type PriorityLevelConfigurationLister interface {
 	// List lists all PriorityLevelConfigurations in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*flowcontrolv1beta1.PriorityLevelConfiguration, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*flowcontrolv1beta1.PriorityLevelConfiguration, err error)
 	// Get retrieves the PriorityLevelConfiguration from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*flowcontrolv1beta1.PriorityLevelConfiguration, error)
+	Get(ctx context.Context, name string) (*flowcontrolv1beta1.PriorityLevelConfiguration, error)
 	PriorityLevelConfigurationListerExpansion
 }
 

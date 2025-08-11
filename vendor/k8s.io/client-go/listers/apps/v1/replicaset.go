@@ -23,6 +23,7 @@ import (
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
+	"context"
 )
 
 // ReplicaSetLister helps list ReplicaSets.
@@ -30,7 +31,7 @@ import (
 type ReplicaSetLister interface {
 	// List lists all ReplicaSets in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*appsv1.ReplicaSet, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*appsv1.ReplicaSet, err error)
 	// ReplicaSets returns an object that can list and get ReplicaSets.
 	ReplicaSets(namespace string) ReplicaSetNamespaceLister
 	ReplicaSetListerExpansion
@@ -56,10 +57,10 @@ func (s *replicaSetLister) ReplicaSets(namespace string) ReplicaSetNamespaceList
 type ReplicaSetNamespaceLister interface {
 	// List lists all ReplicaSets in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*appsv1.ReplicaSet, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*appsv1.ReplicaSet, err error)
 	// Get retrieves the ReplicaSet from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*appsv1.ReplicaSet, error)
+	Get(ctx context.Context, name string) (*appsv1.ReplicaSet, error)
 	ReplicaSetNamespaceListerExpansion
 }
 

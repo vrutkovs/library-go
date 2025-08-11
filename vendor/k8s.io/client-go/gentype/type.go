@@ -30,6 +30,10 @@ import (
 	"k8s.io/client-go/util/consistencydetector"
 	"k8s.io/client-go/util/watchlist"
 	"k8s.io/klog/v2"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // objectWithMeta matches objects implementing both runtime.Object and metav1.Object.
@@ -158,6 +162,13 @@ func (c *Client[T]) GetNamespace() string {
 
 // Get takes name of the resource, and returns the corresponding object, and an error if there is any.
 func (c *Client[T]) Get(ctx context.Context, name string, options metav1.GetOptions) (T, error) {
+	tracer := otel.GetTracerProvider().Tracer("client-go")
+	ctx, span := tracer.Start(ctx, fmt.Sprintf("%s.Get", c.resource), trace.WithAttributes(
+		attribute.String("name", name),
+		attribute.String("namespace", c.namespace),
+	))
+	defer span.End()
+
 	result := c.newObject()
 	err := c.client.Get().
 		UseProtobufAsDefaultIfPreferred(c.prefersProtobuf).
@@ -165,7 +176,9 @@ func (c *Client[T]) Get(ctx context.Context, name string, options metav1.GetOpti
 		Resource(c.resource).
 		Name(name).
 		VersionedParams(&options, c.parameterCodec).
+		Trace(ctx, span, "request ready").
 		Do(ctx).
+		Trace(ctx, span, "response received").
 		Into(result)
 	return result, err
 }
@@ -190,6 +203,12 @@ func (l *alsoLister[T, L]) List(ctx context.Context, opts metav1.ListOptions) (L
 }
 
 func (l *alsoLister[T, L]) list(ctx context.Context, opts metav1.ListOptions) (L, error) {
+	tracer := otel.GetTracerProvider().Tracer("client-go")
+	ctx, span := tracer.Start(ctx, fmt.Sprintf("%s.List", l.client.resource), trace.WithAttributes(
+		attribute.String("namespace", l.client.namespace),
+	))
+	defer span.End()
+
 	list := l.newList()
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
@@ -201,7 +220,9 @@ func (l *alsoLister[T, L]) list(ctx context.Context, opts metav1.ListOptions) (L
 		Resource(l.client.resource).
 		VersionedParams(&opts, l.client.parameterCodec).
 		Timeout(timeout).
+		Trace(ctx, span, "request ready").
 		Do(ctx).
+		Trace(ctx, span, "response received").
 		Into(list)
 	return list, err
 }
@@ -242,6 +263,13 @@ func (c *Client[T]) Watch(ctx context.Context, opts metav1.ListOptions) (watch.I
 
 // Create takes the representation of a resource and creates it.  Returns the server's representation of the resource, and an error, if there is any.
 func (c *Client[T]) Create(ctx context.Context, obj T, opts metav1.CreateOptions) (T, error) {
+	tracer := otel.GetTracerProvider().Tracer("client-go")
+	ctx, span := tracer.Start(ctx, fmt.Sprintf("%s.Create", c.resource), trace.WithAttributes(
+		attribute.String("namespace", c.namespace),
+		attribute.String("name", obj.GetName()),
+	))
+	defer span.End()
+
 	result := c.newObject()
 	err := c.client.Post().
 		UseProtobufAsDefaultIfPreferred(c.prefersProtobuf).
@@ -249,13 +277,22 @@ func (c *Client[T]) Create(ctx context.Context, obj T, opts metav1.CreateOptions
 		Resource(c.resource).
 		VersionedParams(&opts, c.parameterCodec).
 		Body(obj).
+		Trace(ctx, span, "request ready").
 		Do(ctx).
+		Trace(ctx, span, "response received").
 		Into(result)
 	return result, err
 }
 
 // Update takes the representation of a resource and updates it. Returns the server's representation of the resource, and an error, if there is any.
 func (c *Client[T]) Update(ctx context.Context, obj T, opts metav1.UpdateOptions) (T, error) {
+	tracer := otel.GetTracerProvider().Tracer("client-go")
+	ctx, span := tracer.Start(ctx, fmt.Sprintf("%s.Update", c.resource), trace.WithAttributes(
+		attribute.String("namespace", c.namespace),
+		attribute.String("name", obj.GetName()),
+	))
+	defer span.End()
+
 	result := c.newObject()
 	err := c.client.Put().
 		UseProtobufAsDefaultIfPreferred(c.prefersProtobuf).
@@ -264,13 +301,22 @@ func (c *Client[T]) Update(ctx context.Context, obj T, opts metav1.UpdateOptions
 		Name(obj.GetName()).
 		VersionedParams(&opts, c.parameterCodec).
 		Body(obj).
+		Trace(ctx, span, "request ready").
 		Do(ctx).
+		Trace(ctx, span, "response received").
 		Into(result)
 	return result, err
 }
 
 // UpdateStatus updates the status subresource of a resource. Returns the server's representation of the resource, and an error, if there is any.
 func (c *Client[T]) UpdateStatus(ctx context.Context, obj T, opts metav1.UpdateOptions) (T, error) {
+	tracer := otel.GetTracerProvider().Tracer("client-go")
+	ctx, span := tracer.Start(ctx, fmt.Sprintf("%s.UpdateStatus", c.resource), trace.WithAttributes(
+		attribute.String("namespace", c.namespace),
+		attribute.String("name", obj.GetName()),
+	))
+	defer span.End()
+
 	result := c.newObject()
 	err := c.client.Put().
 		UseProtobufAsDefaultIfPreferred(c.prefersProtobuf).
@@ -280,20 +326,31 @@ func (c *Client[T]) UpdateStatus(ctx context.Context, obj T, opts metav1.UpdateO
 		SubResource("status").
 		VersionedParams(&opts, c.parameterCodec).
 		Body(obj).
+		Trace(ctx, span, "request ready").
 		Do(ctx).
+		Trace(ctx, span, "response received").
 		Into(result)
 	return result, err
 }
 
 // Delete takes name of the resource and deletes it. Returns an error if one occurs.
 func (c *Client[T]) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
+	tracer := otel.GetTracerProvider().Tracer("client-go")
+	ctx, span := tracer.Start(ctx, fmt.Sprintf("%s.Delete", c.resource), trace.WithAttributes(
+		attribute.String("namespace", c.namespace),
+		attribute.String("name", name),
+	))
+	defer span.End()
+
 	return c.client.Delete().
 		UseProtobufAsDefaultIfPreferred(c.prefersProtobuf).
 		NamespaceIfScoped(c.namespace, c.namespace != "").
 		Resource(c.resource).
 		Name(name).
 		Body(&opts).
+		Trace(ctx, span, "request ready").
 		Do(ctx).
+		Trace(ctx, span, "response received").
 		Error()
 }
 
@@ -316,6 +373,13 @@ func (l *alsoLister[T, L]) DeleteCollection(ctx context.Context, opts metav1.Del
 
 // Patch applies the patch and returns the patched resource.
 func (c *Client[T]) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (T, error) {
+	tracer := otel.GetTracerProvider().Tracer("client-go")
+	ctx, span := tracer.Start(ctx, fmt.Sprintf("%s.Patch", c.resource), trace.WithAttributes(
+		attribute.String("namespace", c.namespace),
+		attribute.String("name", name),
+	))
+	defer span.End()
+
 	result := c.newObject()
 	err := c.client.Patch(pt).
 		UseProtobufAsDefaultIfPreferred(c.prefersProtobuf).
@@ -325,13 +389,22 @@ func (c *Client[T]) Patch(ctx context.Context, name string, pt types.PatchType, 
 		SubResource(subresources...).
 		VersionedParams(&opts, c.parameterCodec).
 		Body(data).
+		Trace(ctx, span, "request ready").
 		Do(ctx).
+		Trace(ctx, span, "response received").
 		Into(result)
 	return result, err
 }
 
 // Apply takes the given apply declarative configuration, applies it and returns the applied resource.
 func (a *alsoApplier[T, C]) Apply(ctx context.Context, obj C, opts metav1.ApplyOptions) (T, error) {
+	tracer := otel.GetTracerProvider().Tracer("client-go")
+	ctx, span := tracer.Start(ctx, fmt.Sprintf("%s.Apply", a.client.resource), trace.WithAttributes(
+		attribute.String("namespace", a.client.namespace),
+		attribute.String("name", *obj.GetName()),
+	))
+	defer span.End()
+
 	result := a.client.newObject()
 	if obj == *new(C) {
 		return *new(T), fmt.Errorf("object provided to Apply must not be nil")
@@ -352,13 +425,22 @@ func (a *alsoApplier[T, C]) Apply(ctx context.Context, obj C, opts metav1.ApplyO
 		Resource(a.client.resource).
 		Name(*obj.GetName()).
 		VersionedParams(&patchOpts, a.client.parameterCodec).
+		Trace(ctx, span, "request ready").
 		Do(ctx).
+		Trace(ctx, span, "response received").
 		Into(result)
 	return result, err
 }
 
 // Apply takes the given apply declarative configuration, applies it to the status subresource and returns the applied resource.
 func (a *alsoApplier[T, C]) ApplyStatus(ctx context.Context, obj C, opts metav1.ApplyOptions) (T, error) {
+	tracer := otel.GetTracerProvider().Tracer("client-go")
+	ctx, span := tracer.Start(ctx, fmt.Sprintf("%s.ApplyStatus", a.client.resource), trace.WithAttributes(
+		attribute.String("namespace", a.client.namespace),
+		attribute.String("name", *obj.GetName()),
+	))
+	defer span.End()
+
 	if obj == *new(C) {
 		return *new(T), fmt.Errorf("object provided to Apply must not be nil")
 	}
@@ -381,7 +463,9 @@ func (a *alsoApplier[T, C]) ApplyStatus(ctx context.Context, obj C, opts metav1.
 		Name(*obj.GetName()).
 		SubResource("status").
 		VersionedParams(&patchOpts, a.client.parameterCodec).
+		Trace(ctx, span, "request ready").
 		Do(ctx).
+		Trace(ctx, span, "response received").
 		Into(result)
 	return result, err
 }

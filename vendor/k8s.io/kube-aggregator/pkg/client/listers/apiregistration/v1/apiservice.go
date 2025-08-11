@@ -19,6 +19,8 @@ limitations under the License.
 package v1
 
 import (
+	"context"
+
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
@@ -30,10 +32,10 @@ import (
 type APIServiceLister interface {
 	// List lists all APIServices in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*apiregistrationv1.APIService, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*apiregistrationv1.APIService, err error)
 	// Get retrieves the APIService from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*apiregistrationv1.APIService, error)
+	Get(ctx context.Context, name string) (*apiregistrationv1.APIService, error)
 	APIServiceListerExpansion
 }
 

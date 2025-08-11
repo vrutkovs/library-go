@@ -3,6 +3,8 @@
 package v1
 
 import (
+	"context"
+
 	userv1 "github.com/openshift/api/user/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
@@ -14,10 +16,10 @@ import (
 type UserLister interface {
 	// List lists all Users in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*userv1.User, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*userv1.User, err error)
 	// Get retrieves the User from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*userv1.User, error)
+	Get(ctx context.Context, name string) (*userv1.User, error)
 	UserListerExpansion
 }
 

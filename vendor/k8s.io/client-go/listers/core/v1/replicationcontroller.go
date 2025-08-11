@@ -23,6 +23,7 @@ import (
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
+	"context"
 )
 
 // ReplicationControllerLister helps list ReplicationControllers.
@@ -30,7 +31,7 @@ import (
 type ReplicationControllerLister interface {
 	// List lists all ReplicationControllers in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*corev1.ReplicationController, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*corev1.ReplicationController, err error)
 	// ReplicationControllers returns an object that can list and get ReplicationControllers.
 	ReplicationControllers(namespace string) ReplicationControllerNamespaceLister
 	ReplicationControllerListerExpansion
@@ -56,10 +57,10 @@ func (s *replicationControllerLister) ReplicationControllers(namespace string) R
 type ReplicationControllerNamespaceLister interface {
 	// List lists all ReplicationControllers in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*corev1.ReplicationController, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*corev1.ReplicationController, err error)
 	// Get retrieves the ReplicationController from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*corev1.ReplicationController, error)
+	Get(ctx context.Context, name string) (*corev1.ReplicationController, error)
 	ReplicationControllerNamespaceListerExpansion
 }
 

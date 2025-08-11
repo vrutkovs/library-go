@@ -23,6 +23,7 @@ import (
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
+	"context"
 )
 
 // CronJobLister helps list CronJobs.
@@ -30,7 +31,7 @@ import (
 type CronJobLister interface {
 	// List lists all CronJobs in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*batchv1beta1.CronJob, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*batchv1beta1.CronJob, err error)
 	// CronJobs returns an object that can list and get CronJobs.
 	CronJobs(namespace string) CronJobNamespaceLister
 	CronJobListerExpansion
@@ -56,10 +57,10 @@ func (s *cronJobLister) CronJobs(namespace string) CronJobNamespaceLister {
 type CronJobNamespaceLister interface {
 	// List lists all CronJobs in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*batchv1beta1.CronJob, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*batchv1beta1.CronJob, err error)
 	// Get retrieves the CronJob from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*batchv1beta1.CronJob, error)
+	Get(ctx context.Context, name string) (*batchv1beta1.CronJob, error)
 	CronJobNamespaceListerExpansion
 }
 

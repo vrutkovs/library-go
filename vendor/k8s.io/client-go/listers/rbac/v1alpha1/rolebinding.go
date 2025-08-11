@@ -23,6 +23,7 @@ import (
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
+	"context"
 )
 
 // RoleBindingLister helps list RoleBindings.
@@ -30,7 +31,7 @@ import (
 type RoleBindingLister interface {
 	// List lists all RoleBindings in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*rbacv1alpha1.RoleBinding, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*rbacv1alpha1.RoleBinding, err error)
 	// RoleBindings returns an object that can list and get RoleBindings.
 	RoleBindings(namespace string) RoleBindingNamespaceLister
 	RoleBindingListerExpansion
@@ -56,10 +57,10 @@ func (s *roleBindingLister) RoleBindings(namespace string) RoleBindingNamespaceL
 type RoleBindingNamespaceLister interface {
 	// List lists all RoleBindings in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*rbacv1alpha1.RoleBinding, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*rbacv1alpha1.RoleBinding, err error)
 	// Get retrieves the RoleBinding from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*rbacv1alpha1.RoleBinding, error)
+	Get(ctx context.Context, name string) (*rbacv1alpha1.RoleBinding, error)
 	RoleBindingNamespaceListerExpansion
 }
 

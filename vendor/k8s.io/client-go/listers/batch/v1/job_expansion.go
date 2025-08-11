@@ -17,10 +17,11 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	"fmt"
 
 	batch "k8s.io/api/batch/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -46,7 +47,7 @@ func (l *jobLister) GetPodJobs(pod *v1.Pod) (jobs []batch.Job, err error) {
 	}
 
 	var list []*batch.Job
-	list, err = l.Jobs(pod.Namespace).List(labels.Everything())
+	list, err = l.Jobs(pod.Namespace).List(context.Background(), labels.Everything())
 	if err != nil {
 		return
 	}

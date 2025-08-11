@@ -23,6 +23,7 @@ import (
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
+	"context"
 )
 
 // PersistentVolumeLister helps list PersistentVolumes.
@@ -30,10 +31,10 @@ import (
 type PersistentVolumeLister interface {
 	// List lists all PersistentVolumes in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*corev1.PersistentVolume, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*corev1.PersistentVolume, err error)
 	// Get retrieves the PersistentVolume from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*corev1.PersistentVolume, error)
+	Get(ctx context.Context, name string) (*corev1.PersistentVolume, error)
 	PersistentVolumeListerExpansion
 }
 

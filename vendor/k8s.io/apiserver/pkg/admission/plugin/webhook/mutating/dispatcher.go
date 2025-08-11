@@ -70,8 +70,8 @@ type mutatingDispatcher struct {
 	plugin *Plugin
 }
 
-func newMutatingDispatcher(p *Plugin) func(cm *webhookutil.ClientManager) generic.Dispatcher {
-	return func(cm *webhookutil.ClientManager) generic.Dispatcher {
+func newMutatingDispatcher(ctx context.Context, p *Plugin) func(ctx context.Context, cm *webhookutil.ClientManager) generic.Dispatcher {
+	return func(ctx context.Context, cm *webhookutil.ClientManager) generic.Dispatcher {
 		return &mutatingDispatcher{cm, p}
 	}
 }

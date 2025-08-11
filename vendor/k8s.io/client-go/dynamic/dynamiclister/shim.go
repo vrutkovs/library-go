@@ -17,6 +17,8 @@ limitations under the License.
 package dynamiclister
 
 import (
+	"context"
+
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
@@ -37,8 +39,8 @@ func NewRuntimeObjectShim(lister Lister) cache.GenericLister {
 }
 
 // List will return all objects across namespaces
-func (s *dynamicListerShim) List(selector labels.Selector) (ret []runtime.Object, err error) {
-	objs, err := s.lister.List(selector)
+func (s *dynamicListerShim) List(ctx context.Context, selector labels.Selector) (ret []runtime.Object, err error) {
+	objs, err := s.lister.List(ctx, selector)
 	if err != nil {
 		return nil, err
 	}
@@ -51,13 +53,13 @@ func (s *dynamicListerShim) List(selector labels.Selector) (ret []runtime.Object
 }
 
 // Get will attempt to retrieve assuming that name==key
-func (s *dynamicListerShim) Get(name string) (runtime.Object, error) {
-	return s.lister.Get(name)
+func (s *dynamicListerShim) Get(ctx context.Context, name string) (runtime.Object, error) {
+	return s.lister.Get(ctx, name)
 }
 
-func (s *dynamicListerShim) ByNamespace(namespace string) cache.GenericNamespaceLister {
+func (s *dynamicListerShim) ByNamespace(ctx context.Context, namespace string) cache.GenericNamespaceLister {
 	return &dynamicNamespaceListerShim{
-		namespaceLister: s.lister.Namespace(namespace),
+		namespaceLister: s.lister.Namespace(ctx, namespace),
 	}
 }
 
@@ -68,8 +70,8 @@ type dynamicNamespaceListerShim struct {
 }
 
 // List will return all objects in this namespace
-func (ns *dynamicNamespaceListerShim) List(selector labels.Selector) (ret []runtime.Object, err error) {
-	objs, err := ns.namespaceLister.List(selector)
+func (ns *dynamicNamespaceListerShim) List(ctx context.Context, selector labels.Selector) (ret []runtime.Object, err error) {
+	objs, err := ns.namespaceLister.List(ctx, selector)
 	if err != nil {
 		return nil, err
 	}
@@ -82,6 +84,6 @@ func (ns *dynamicNamespaceListerShim) List(selector labels.Selector) (ret []runt
 }
 
 // Get will attempt to retrieve by namespace and name
-func (ns *dynamicNamespaceListerShim) Get(name string) (runtime.Object, error) {
+func (ns *dynamicNamespaceListerShim) Get(ctx context.Context, name string) (runtime.Object, error) {
 	return ns.namespaceLister.Get(name)
 }

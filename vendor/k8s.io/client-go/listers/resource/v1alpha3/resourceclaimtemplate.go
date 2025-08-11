@@ -23,6 +23,7 @@ import (
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
+	"context"
 )
 
 // ResourceClaimTemplateLister helps list ResourceClaimTemplates.
@@ -30,7 +31,7 @@ import (
 type ResourceClaimTemplateLister interface {
 	// List lists all ResourceClaimTemplates in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*resourcev1alpha3.ResourceClaimTemplate, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*resourcev1alpha3.ResourceClaimTemplate, err error)
 	// ResourceClaimTemplates returns an object that can list and get ResourceClaimTemplates.
 	ResourceClaimTemplates(namespace string) ResourceClaimTemplateNamespaceLister
 	ResourceClaimTemplateListerExpansion
@@ -56,10 +57,10 @@ func (s *resourceClaimTemplateLister) ResourceClaimTemplates(namespace string) R
 type ResourceClaimTemplateNamespaceLister interface {
 	// List lists all ResourceClaimTemplates in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*resourcev1alpha3.ResourceClaimTemplate, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*resourcev1alpha3.ResourceClaimTemplate, err error)
 	// Get retrieves the ResourceClaimTemplate from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*resourcev1alpha3.ResourceClaimTemplate, error)
+	Get(ctx context.Context, name string) (*resourcev1alpha3.ResourceClaimTemplate, error)
 	ResourceClaimTemplateNamespaceListerExpansion
 }
 

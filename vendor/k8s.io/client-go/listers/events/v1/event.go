@@ -23,6 +23,7 @@ import (
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
+	"context"
 )
 
 // EventLister helps list Events.
@@ -30,7 +31,7 @@ import (
 type EventLister interface {
 	// List lists all Events in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*eventsv1.Event, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*eventsv1.Event, err error)
 	// Events returns an object that can list and get Events.
 	Events(namespace string) EventNamespaceLister
 	EventListerExpansion
@@ -56,10 +57,10 @@ func (s *eventLister) Events(namespace string) EventNamespaceLister {
 type EventNamespaceLister interface {
 	// List lists all Events in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*eventsv1.Event, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*eventsv1.Event, err error)
 	// Get retrieves the Event from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*eventsv1.Event, error)
+	Get(ctx context.Context, name string) (*eventsv1.Event, error)
 	EventNamespaceListerExpansion
 }
 

@@ -23,6 +23,7 @@ import (
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
+	"context"
 )
 
 // DeviceClassLister helps list DeviceClasses.
@@ -30,10 +31,10 @@ import (
 type DeviceClassLister interface {
 	// List lists all DeviceClasses in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*resourcev1alpha3.DeviceClass, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*resourcev1alpha3.DeviceClass, err error)
 	// Get retrieves the DeviceClass from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*resourcev1alpha3.DeviceClass, error)
+	Get(ctx context.Context, name string) (*resourcev1alpha3.DeviceClass, error)
 	DeviceClassListerExpansion
 }
 

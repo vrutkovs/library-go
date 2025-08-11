@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	storagev1 "k8s.io/api/storage/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
@@ -30,10 +31,10 @@ import (
 type CSIDriverLister interface {
 	// List lists all CSIDrivers in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*storagev1.CSIDriver, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*storagev1.CSIDriver, err error)
 	// Get retrieves the CSIDriver from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*storagev1.CSIDriver, error)
+	Get(ctx context.Context, name string) (*storagev1.CSIDriver, error)
 	CSIDriverListerExpansion
 }
 

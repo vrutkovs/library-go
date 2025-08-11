@@ -767,6 +767,10 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 	if c.Serializer == nil {
 		return nil, fmt.Errorf("Genericapiserver.New() called with config.Serializer == nil")
 	}
+
+	ctx, span := tracing.Start(context.Background(), "completedConfig.New")
+	defer span.End(500 * time.Millisecond)
+
 	allowedMediaTypes := defaultAllowedMediaTypes
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.CBORServingAndStorage) {
 		allowedMediaTypes = append(allowedMediaTypes, runtime.ContentTypeCBOR)
@@ -921,7 +925,7 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 	if s.isPostStartHookRegistered(priorityAndFairnessConfigConsumerHookName) {
 	} else if c.FlowControl != nil {
 		err := s.AddPostStartHook(priorityAndFairnessConfigConsumerHookName, func(hookContext PostStartHookContext) error {
-			go c.FlowControl.Run(hookContext.Done())
+			go c.FlowControl.Run(ctx, hookContext.Done())
 			return nil
 		})
 		if err != nil {

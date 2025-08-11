@@ -17,6 +17,8 @@ limitations under the License.
 package dynamiclister
 
 import (
+	"context"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -24,17 +26,17 @@ import (
 // Lister helps list resources.
 type Lister interface {
 	// List lists all resources in the indexer.
-	List(selector labels.Selector) (ret []*unstructured.Unstructured, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*unstructured.Unstructured, err error)
 	// Get retrieves a resource from the indexer with the given name
-	Get(name string) (*unstructured.Unstructured, error)
+	Get(ctx context.Context, name string) (*unstructured.Unstructured, error)
 	// Namespace returns an object that can list and get resources in a given namespace.
-	Namespace(namespace string) NamespaceLister
+	Namespace(ctx context.Context, namespace string) NamespaceLister
 }
 
 // NamespaceLister helps list and get resources.
 type NamespaceLister interface {
 	// List lists all resources in the indexer for a given namespace.
-	List(selector labels.Selector) (ret []*unstructured.Unstructured, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*unstructured.Unstructured, err error)
 	// Get retrieves a resource from the indexer for a given namespace and name.
 	Get(name string) (*unstructured.Unstructured, error)
 }

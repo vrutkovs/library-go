@@ -23,6 +23,7 @@ import (
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
+	"context"
 )
 
 // PodLister helps list Pods.
@@ -30,7 +31,7 @@ import (
 type PodLister interface {
 	// List lists all Pods in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*corev1.Pod, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*corev1.Pod, err error)
 	// Pods returns an object that can list and get Pods.
 	Pods(namespace string) PodNamespaceLister
 	PodListerExpansion
@@ -56,10 +57,10 @@ func (s *podLister) Pods(namespace string) PodNamespaceLister {
 type PodNamespaceLister interface {
 	// List lists all Pods in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*corev1.Pod, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*corev1.Pod, err error)
 	// Get retrieves the Pod from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*corev1.Pod, error)
+	Get(ctx context.Context, name string) (*corev1.Pod, error)
 	PodNamespaceListerExpansion
 }
 

@@ -17,6 +17,7 @@ limitations under the License.
 package generic
 
 import (
+	"context"
 	"fmt"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
@@ -34,15 +35,15 @@ type PolicyMatcher interface {
 
 	// DefinitionMatches says whether this policy definition matches the provided admission
 	// resource request
-	DefinitionMatches(a admission.Attributes, o admission.ObjectInterfaces, definition PolicyAccessor) (bool, schema.GroupVersionResource, schema.GroupVersionKind, error)
+	DefinitionMatches(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces, definition PolicyAccessor) (bool, schema.GroupVersionResource, schema.GroupVersionKind, error)
 
 	// BindingMatches says whether this policy definition matches the provided admission
 	// resource request
-	BindingMatches(a admission.Attributes, o admission.ObjectInterfaces, binding BindingAccessor) (bool, error)
+	BindingMatches(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces, binding BindingAccessor) (bool, error)
 
 	// GetNamespace retrieves the Namespace resource by the given name. The name may be empty, in which case
 	// GetNamespace must return nil, nil
-	GetNamespace(name string) (*corev1.Namespace, error)
+	GetNamespace(ctx context.Context, name string) (*corev1.Namespace, error)
 }
 
 type matcher struct {
@@ -61,29 +62,29 @@ func (c *matcher) ValidateInitialization() error {
 }
 
 // DefinitionMatches returns whether this ValidatingAdmissionPolicy matches the provided admission resource request
-func (c *matcher) DefinitionMatches(a admission.Attributes, o admission.ObjectInterfaces, definition PolicyAccessor) (bool, schema.GroupVersionResource, schema.GroupVersionKind, error) {
+func (c *matcher) DefinitionMatches(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces, definition PolicyAccessor) (bool, schema.GroupVersionResource, schema.GroupVersionKind, error) {
 	constraints := definition.GetMatchConstraints()
 	if constraints == nil {
 		return false, schema.GroupVersionResource{}, schema.GroupVersionKind{}, fmt.Errorf("policy contained no match constraints, a required field")
 	}
 	criteria := matchCriteria{constraints: constraints}
-	return c.Matcher.Matches(a, o, &criteria)
+	return c.Matcher.Matches(ctx, a, o, &criteria)
 }
 
 // BindingMatches returns whether this ValidatingAdmissionPolicyBinding matches the provided admission resource request
-func (c *matcher) BindingMatches(a admission.Attributes, o admission.ObjectInterfaces, binding BindingAccessor) (bool, error) {
+func (c *matcher) BindingMatches(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces, binding BindingAccessor) (bool, error) {
 	matchResources := binding.GetMatchResources()
 	if matchResources == nil {
 		return true, nil
 	}
 
 	criteria := matchCriteria{constraints: matchResources}
-	isMatch, _, _, err := c.Matcher.Matches(a, o, &criteria)
+	isMatch, _, _, err := c.Matcher.Matches(ctx, a, o, &criteria)
 	return isMatch, err
 }
 
-func (c *matcher) GetNamespace(name string) (*corev1.Namespace, error) {
-	return c.Matcher.GetNamespace(name)
+func (c *matcher) GetNamespace(ctx context.Context, name string) (*corev1.Namespace, error) {
+	return c.Matcher.GetNamespace(ctx, name)
 }
 
 var _ matching.MatchCriteria = &matchCriteria{}

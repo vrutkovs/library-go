@@ -23,6 +23,7 @@ import (
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
+	"context"
 )
 
 // DaemonSetLister helps list DaemonSets.
@@ -30,7 +31,7 @@ import (
 type DaemonSetLister interface {
 	// List lists all DaemonSets in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*extensionsv1beta1.DaemonSet, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*extensionsv1beta1.DaemonSet, err error)
 	// DaemonSets returns an object that can list and get DaemonSets.
 	DaemonSets(namespace string) DaemonSetNamespaceLister
 	DaemonSetListerExpansion
@@ -56,10 +57,10 @@ func (s *daemonSetLister) DaemonSets(namespace string) DaemonSetNamespaceLister 
 type DaemonSetNamespaceLister interface {
 	// List lists all DaemonSets in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*extensionsv1beta1.DaemonSet, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*extensionsv1beta1.DaemonSet, err error)
 	// Get retrieves the DaemonSet from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*extensionsv1beta1.DaemonSet, error)
+	Get(ctx context.Context, name string) (*extensionsv1beta1.DaemonSet, error)
 	DaemonSetNamespaceListerExpansion
 }
 

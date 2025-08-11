@@ -23,6 +23,7 @@ import (
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
+	"context"
 )
 
 // StorageClassLister helps list StorageClasses.
@@ -30,10 +31,10 @@ import (
 type StorageClassLister interface {
 	// List lists all StorageClasses in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*storagev1.StorageClass, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*storagev1.StorageClass, err error)
 	// Get retrieves the StorageClass from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*storagev1.StorageClass, error)
+	Get(ctx context.Context, name string) (*storagev1.StorageClass, error)
 	StorageClassListerExpansion
 }
 

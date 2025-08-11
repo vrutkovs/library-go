@@ -23,6 +23,7 @@ import (
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
+	"context"
 )
 
 // PriorityLevelConfigurationLister helps list PriorityLevelConfigurations.
@@ -30,10 +31,10 @@ import (
 type PriorityLevelConfigurationLister interface {
 	// List lists all PriorityLevelConfigurations in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*flowcontrolv1beta3.PriorityLevelConfiguration, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*flowcontrolv1beta3.PriorityLevelConfiguration, err error)
 	// Get retrieves the PriorityLevelConfiguration from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*flowcontrolv1beta3.PriorityLevelConfiguration, error)
+	Get(ctx context.Context, name string) (*flowcontrolv1beta3.PriorityLevelConfiguration, error)
 	PriorityLevelConfigurationListerExpansion
 }
 

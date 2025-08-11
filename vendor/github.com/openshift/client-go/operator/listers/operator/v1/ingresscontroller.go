@@ -3,6 +3,8 @@
 package v1
 
 import (
+	"context"
+
 	operatorv1 "github.com/openshift/api/operator/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
@@ -14,7 +16,7 @@ import (
 type IngressControllerLister interface {
 	// List lists all IngressControllers in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*operatorv1.IngressController, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*operatorv1.IngressController, err error)
 	// IngressControllers returns an object that can list and get IngressControllers.
 	IngressControllers(namespace string) IngressControllerNamespaceLister
 	IngressControllerListerExpansion
@@ -40,10 +42,10 @@ func (s *ingressControllerLister) IngressControllers(namespace string) IngressCo
 type IngressControllerNamespaceLister interface {
 	// List lists all IngressControllers in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*operatorv1.IngressController, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*operatorv1.IngressController, err error)
 	// Get retrieves the IngressController from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*operatorv1.IngressController, error)
+	Get(ctx context.Context, name string) (*operatorv1.IngressController, error)
 	IngressControllerNamespaceListerExpansion
 }
 

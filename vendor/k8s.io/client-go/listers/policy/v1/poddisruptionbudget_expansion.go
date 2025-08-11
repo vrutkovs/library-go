@@ -17,9 +17,10 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -39,7 +40,7 @@ type PodDisruptionBudgetNamespaceListerExpansion interface{}
 func (s *podDisruptionBudgetLister) GetPodPodDisruptionBudgets(pod *v1.Pod) ([]*policy.PodDisruptionBudget, error) {
 	var selector labels.Selector
 
-	list, err := s.PodDisruptionBudgets(pod.Namespace).List(labels.Everything())
+	list, err := s.PodDisruptionBudgets(pod.Namespace).List(context.Background(), labels.Everything())
 	if err != nil {
 		return nil, err
 	}

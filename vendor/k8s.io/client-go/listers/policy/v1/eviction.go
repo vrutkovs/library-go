@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	policyv1 "k8s.io/api/policy/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
@@ -30,7 +31,7 @@ import (
 type EvictionLister interface {
 	// List lists all Evictions in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*policyv1.Eviction, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*policyv1.Eviction, err error)
 	// Evictions returns an object that can list and get Evictions.
 	Evictions(namespace string) EvictionNamespaceLister
 	EvictionListerExpansion
@@ -56,10 +57,10 @@ func (s *evictionLister) Evictions(namespace string) EvictionNamespaceLister {
 type EvictionNamespaceLister interface {
 	// List lists all Evictions in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*policyv1.Eviction, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*policyv1.Eviction, err error)
 	// Get retrieves the Eviction from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*policyv1.Eviction, error)
+	Get(ctx context.Context, name string) (*policyv1.Eviction, error)
 	EvictionNamespaceListerExpansion
 }
 

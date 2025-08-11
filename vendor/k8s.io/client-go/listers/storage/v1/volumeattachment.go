@@ -23,6 +23,7 @@ import (
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
+	"context"
 )
 
 // VolumeAttachmentLister helps list VolumeAttachments.
@@ -30,10 +31,10 @@ import (
 type VolumeAttachmentLister interface {
 	// List lists all VolumeAttachments in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*storagev1.VolumeAttachment, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*storagev1.VolumeAttachment, err error)
 	// Get retrieves the VolumeAttachment from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*storagev1.VolumeAttachment, error)
+	Get(ctx context.Context, name string) (*storagev1.VolumeAttachment, error)
 	VolumeAttachmentListerExpansion
 }
 

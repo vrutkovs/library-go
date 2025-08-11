@@ -23,6 +23,7 @@ import (
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
+	"context"
 )
 
 // ServiceAccountLister helps list ServiceAccounts.
@@ -30,7 +31,7 @@ import (
 type ServiceAccountLister interface {
 	// List lists all ServiceAccounts in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*corev1.ServiceAccount, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*corev1.ServiceAccount, err error)
 	// ServiceAccounts returns an object that can list and get ServiceAccounts.
 	ServiceAccounts(namespace string) ServiceAccountNamespaceLister
 	ServiceAccountListerExpansion
@@ -56,10 +57,10 @@ func (s *serviceAccountLister) ServiceAccounts(namespace string) ServiceAccountN
 type ServiceAccountNamespaceLister interface {
 	// List lists all ServiceAccounts in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*corev1.ServiceAccount, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*corev1.ServiceAccount, err error)
 	// Get retrieves the ServiceAccount from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*corev1.ServiceAccount, error)
+	Get(ctx context.Context, name string) (*corev1.ServiceAccount, error)
 	ServiceAccountNamespaceListerExpansion
 }
 

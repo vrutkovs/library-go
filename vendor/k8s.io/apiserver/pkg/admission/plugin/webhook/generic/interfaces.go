@@ -30,7 +30,7 @@ type VersionedAttributeAccessor interface {
 
 // Source can list dynamic webhook plugins.
 type Source interface {
-	Webhooks() []webhook.WebhookAccessor
+	Webhooks(ctx context.Context) []webhook.WebhookAccessor
 	HasSynced() bool
 }
 

@@ -57,8 +57,8 @@ type validatingDispatcher struct {
 	plugin *Plugin
 }
 
-func newValidatingDispatcher(p *Plugin) func(cm *webhookutil.ClientManager) generic.Dispatcher {
-	return func(cm *webhookutil.ClientManager) generic.Dispatcher {
+func newValidatingDispatcher(p *Plugin) func(ctx context.Context, cm *webhookutil.ClientManager) generic.Dispatcher {
+	return func(ctx context.Context, cm *webhookutil.ClientManager) generic.Dispatcher {
 		return &validatingDispatcher{cm, p}
 	}
 }

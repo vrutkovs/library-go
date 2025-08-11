@@ -7,6 +7,7 @@ import (
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
+	"context"
 )
 
 // ClusterOperatorLister helps list ClusterOperators.
@@ -14,10 +15,10 @@ import (
 type ClusterOperatorLister interface {
 	// List lists all ClusterOperators in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*configv1.ClusterOperator, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*configv1.ClusterOperator, err error)
 	// Get retrieves the ClusterOperator from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*configv1.ClusterOperator, error)
+	Get(ctx context.Context, name string) (*configv1.ClusterOperator, error)
 	ClusterOperatorListerExpansion
 }
 

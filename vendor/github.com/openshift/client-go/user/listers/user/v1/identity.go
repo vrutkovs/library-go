@@ -3,6 +3,8 @@
 package v1
 
 import (
+	"context"
+
 	userv1 "github.com/openshift/api/user/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
@@ -14,10 +16,10 @@ import (
 type IdentityLister interface {
 	// List lists all Identities in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*userv1.Identity, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*userv1.Identity, err error)
 	// Get retrieves the Identity from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*userv1.Identity, error)
+	Get(ctx context.Context, name string) (*userv1.Identity, error)
 	IdentityListerExpansion
 }
 

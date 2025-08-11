@@ -23,6 +23,7 @@ import (
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
+	"context"
 )
 
 // MutatingWebhookConfigurationLister helps list MutatingWebhookConfigurations.
@@ -30,10 +31,10 @@ import (
 type MutatingWebhookConfigurationLister interface {
 	// List lists all MutatingWebhookConfigurations in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*admissionregistrationv1.MutatingWebhookConfiguration, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*admissionregistrationv1.MutatingWebhookConfiguration, err error)
 	// Get retrieves the MutatingWebhookConfiguration from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*admissionregistrationv1.MutatingWebhookConfiguration, error)
+	Get(ctx context.Context, name string) (*admissionregistrationv1.MutatingWebhookConfiguration, error)
 	MutatingWebhookConfigurationListerExpansion
 }
 

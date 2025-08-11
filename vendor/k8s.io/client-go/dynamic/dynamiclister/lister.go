@@ -17,6 +17,11 @@ limitations under the License.
 package dynamiclister
 
 import (
+	"context"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -39,7 +44,13 @@ func New(indexer cache.Indexer, gvr schema.GroupVersionResource) Lister {
 }
 
 // List lists all resources in the indexer.
-func (l *dynamicLister) List(selector labels.Selector) (ret []*unstructured.Unstructured, err error) {
+func (l *dynamicLister) List(ctx context.Context, selector labels.Selector) (ret []*unstructured.Unstructured, err error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "dynamicLister.List", trace.WithAttributes(
+		attribute.String("selector", selector.String()),
+	))
+	defer span.End()
+
 	err = cache.ListAll(l.indexer, selector, func(m interface{}) {
 		ret = append(ret, m.(*unstructured.Unstructured))
 	})
@@ -47,7 +58,13 @@ func (l *dynamicLister) List(selector labels.Selector) (ret []*unstructured.Unst
 }
 
 // Get retrieves a resource from the indexer with the given name
-func (l *dynamicLister) Get(name string) (*unstructured.Unstructured, error) {
+func (l *dynamicLister) Get(ctx context.Context, name string) (*unstructured.Unstructured, error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "dynamicNamespaceLister.Get", trace.WithAttributes(
+		attribute.String("name", name),
+	))
+	defer span.End()
+
 	obj, exists, err := l.indexer.GetByKey(name)
 	if err != nil {
 		return nil, err
@@ -59,7 +76,7 @@ func (l *dynamicLister) Get(name string) (*unstructured.Unstructured, error) {
 }
 
 // Namespace returns an object that can list and get resources from a given namespace.
-func (l *dynamicLister) Namespace(namespace string) NamespaceLister {
+func (l *dynamicLister) Namespace(ctx context.Context, namespace string) NamespaceLister {
 	return &dynamicNamespaceLister{indexer: l.indexer, namespace: namespace, gvr: l.gvr}
 }
 
@@ -71,7 +88,13 @@ type dynamicNamespaceLister struct {
 }
 
 // List lists all resources in the indexer for a given namespace.
-func (l *dynamicNamespaceLister) List(selector labels.Selector) (ret []*unstructured.Unstructured, err error) {
+func (l *dynamicNamespaceLister) List(ctx context.Context, selector labels.Selector) (ret []*unstructured.Unstructured, err error) {
+	tracer := otel.GetTracerProvider().Tracer("library-go")
+	ctx, span := tracer.Start(ctx, "dynamicNamespaceLister.List", trace.WithAttributes(
+		attribute.String("selector", selector.String()),
+	))
+	defer span.End()
+
 	err = cache.ListAllByNamespace(l.indexer, l.namespace, selector, func(m interface{}) {
 		ret = append(ret, m.(*unstructured.Unstructured))
 	})

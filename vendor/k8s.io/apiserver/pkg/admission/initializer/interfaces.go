@@ -17,6 +17,8 @@ limitations under the License.
 package initializer
 
 import (
+	"context"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
@@ -49,7 +51,7 @@ type WantsAuthorizer interface {
 
 // WantsQuotaConfiguration defines a function which sets quota configuration for admission plugins that need it.
 type WantsQuotaConfiguration interface {
-	SetQuotaConfiguration(quota.Configuration)
+	SetQuotaConfiguration(context.Context, quota.Configuration)
 	admission.InitializationValidator
 }
 

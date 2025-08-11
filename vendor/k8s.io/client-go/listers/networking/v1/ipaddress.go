@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	networkingv1 "k8s.io/api/networking/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
@@ -30,10 +31,10 @@ import (
 type IPAddressLister interface {
 	// List lists all IPAddresses in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*networkingv1.IPAddress, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*networkingv1.IPAddress, err error)
 	// Get retrieves the IPAddress from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*networkingv1.IPAddress, error)
+	Get(ctx context.Context, name string) (*networkingv1.IPAddress, error)
 	IPAddressListerExpansion
 }
 

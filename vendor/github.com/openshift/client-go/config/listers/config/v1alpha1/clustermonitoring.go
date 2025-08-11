@@ -3,6 +3,8 @@
 package v1alpha1
 
 import (
+	"context"
+
 	configv1alpha1 "github.com/openshift/api/config/v1alpha1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
@@ -14,10 +16,10 @@ import (
 type ClusterMonitoringLister interface {
 	// List lists all ClusterMonitorings in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*configv1alpha1.ClusterMonitoring, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*configv1alpha1.ClusterMonitoring, err error)
 	// Get retrieves the ClusterMonitoring from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*configv1alpha1.ClusterMonitoring, error)
+	Get(ctx context.Context, name string) (*configv1alpha1.ClusterMonitoring, error)
 	ClusterMonitoringListerExpansion
 }
 

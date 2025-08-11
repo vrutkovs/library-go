@@ -3,6 +3,8 @@
 package v1alpha2
 
 import (
+	"context"
+
 	configv1alpha2 "github.com/openshift/api/config/v1alpha2"
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
@@ -14,10 +16,10 @@ import (
 type InsightsDataGatherLister interface {
 	// List lists all InsightsDataGathers in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*configv1alpha2.InsightsDataGather, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*configv1alpha2.InsightsDataGather, err error)
 	// Get retrieves the InsightsDataGather from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*configv1alpha2.InsightsDataGather, error)
+	Get(ctx context.Context, name string) (*configv1alpha2.InsightsDataGather, error)
 	InsightsDataGatherListerExpansion
 }
 

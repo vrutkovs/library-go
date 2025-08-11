@@ -17,6 +17,7 @@ limitations under the License.
 package matching
 
 import (
+	"context"
 	"fmt"
 
 	v1 "k8s.io/api/admissionregistration/v1"
@@ -44,8 +45,8 @@ type Matcher struct {
 	objectMatcher    *object.Matcher
 }
 
-func (m *Matcher) GetNamespace(name string) (*corev1.Namespace, error) {
-	return m.namespaceMatcher.GetNamespace(name)
+func (m *Matcher) GetNamespace(ctx context.Context, name string) (*corev1.Namespace, error) {
+	return m.namespaceMatcher.GetNamespace(ctx, name)
 }
 
 // NewMatcher initialize the matcher with dependencies requires
@@ -70,8 +71,8 @@ func (m *Matcher) ValidateInitialization() error {
 	return nil
 }
 
-func (m *Matcher) Matches(attr admission.Attributes, o admission.ObjectInterfaces, criteria MatchCriteria) (bool, schema.GroupVersionResource, schema.GroupVersionKind, error) {
-	matches, matchNsErr := m.namespaceMatcher.MatchNamespaceSelector(criteria, attr)
+func (m *Matcher) Matches(ctx context.Context, attr admission.Attributes, o admission.ObjectInterfaces, criteria MatchCriteria) (bool, schema.GroupVersionResource, schema.GroupVersionKind, error) {
+	matches, matchNsErr := m.namespaceMatcher.MatchNamespaceSelector(ctx, criteria, attr)
 	// Should not return an error here for policy which do not apply to the request, even if err is an unexpected scenario.
 	if !matches && matchNsErr == nil {
 		return false, schema.GroupVersionResource{}, schema.GroupVersionKind{}, nil

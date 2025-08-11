@@ -23,6 +23,7 @@ import (
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
+	"context"
 )
 
 // FlowSchemaLister helps list FlowSchemas.
@@ -30,10 +31,10 @@ import (
 type FlowSchemaLister interface {
 	// List lists all FlowSchemas in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*flowcontrolv1beta2.FlowSchema, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*flowcontrolv1beta2.FlowSchema, err error)
 	// Get retrieves the FlowSchema from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*flowcontrolv1beta2.FlowSchema, error)
+	Get(ctx context.Context, name string) (*flowcontrolv1beta2.FlowSchema, error)
 	FlowSchemaListerExpansion
 }
 

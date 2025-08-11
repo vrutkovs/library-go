@@ -23,6 +23,7 @@ import (
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
+	"context"
 )
 
 // ValidatingWebhookConfigurationLister helps list ValidatingWebhookConfigurations.
@@ -30,10 +31,10 @@ import (
 type ValidatingWebhookConfigurationLister interface {
 	// List lists all ValidatingWebhookConfigurations in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*admissionregistrationv1beta1.ValidatingWebhookConfiguration, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*admissionregistrationv1beta1.ValidatingWebhookConfiguration, err error)
 	// Get retrieves the ValidatingWebhookConfiguration from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*admissionregistrationv1beta1.ValidatingWebhookConfiguration, error)
+	Get(ctx context.Context, name string) (*admissionregistrationv1beta1.ValidatingWebhookConfiguration, error)
 	ValidatingWebhookConfigurationListerExpansion
 }
 

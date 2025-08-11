@@ -23,6 +23,7 @@ import (
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
+	"context"
 )
 
 // ControllerRevisionLister helps list ControllerRevisions.
@@ -30,7 +31,7 @@ import (
 type ControllerRevisionLister interface {
 	// List lists all ControllerRevisions in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*appsv1beta2.ControllerRevision, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*appsv1beta2.ControllerRevision, err error)
 	// ControllerRevisions returns an object that can list and get ControllerRevisions.
 	ControllerRevisions(namespace string) ControllerRevisionNamespaceLister
 	ControllerRevisionListerExpansion
@@ -56,10 +57,10 @@ func (s *controllerRevisionLister) ControllerRevisions(namespace string) Control
 type ControllerRevisionNamespaceLister interface {
 	// List lists all ControllerRevisions in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*appsv1beta2.ControllerRevision, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*appsv1beta2.ControllerRevision, err error)
 	// Get retrieves the ControllerRevision from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*appsv1beta2.ControllerRevision, error)
+	Get(ctx context.Context, name string) (*appsv1beta2.ControllerRevision, error)
 	ControllerRevisionNamespaceListerExpansion
 }
 

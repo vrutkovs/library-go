@@ -19,6 +19,8 @@ limitations under the License.
 package v1beta1
 
 import (
+	"context"
+
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
@@ -30,10 +32,10 @@ import (
 type CustomResourceDefinitionLister interface {
 	// List lists all CustomResourceDefinitions in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*apiextensionsv1beta1.CustomResourceDefinition, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*apiextensionsv1beta1.CustomResourceDefinition, err error)
 	// Get retrieves the CustomResourceDefinition from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*apiextensionsv1beta1.CustomResourceDefinition, error)
+	Get(ctx context.Context, name string) (*apiextensionsv1beta1.CustomResourceDefinition, error)
 	CustomResourceDefinitionListerExpansion
 }
 

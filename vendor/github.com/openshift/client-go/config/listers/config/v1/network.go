@@ -3,6 +3,8 @@
 package v1
 
 import (
+	"context"
+
 	configv1 "github.com/openshift/api/config/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
@@ -14,10 +16,10 @@ import (
 type NetworkLister interface {
 	// List lists all Networks in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*configv1.Network, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*configv1.Network, err error)
 	// Get retrieves the Network from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*configv1.Network, error)
+	Get(ctx context.Context, name string) (*configv1.Network, error)
 	NetworkListerExpansion
 }
 

@@ -23,6 +23,7 @@ import (
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
+	"context"
 )
 
 // JobLister helps list Jobs.
@@ -30,7 +31,7 @@ import (
 type JobLister interface {
 	// List lists all Jobs in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*batchv1.Job, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*batchv1.Job, err error)
 	// Jobs returns an object that can list and get Jobs.
 	Jobs(namespace string) JobNamespaceLister
 	JobListerExpansion
@@ -56,10 +57,10 @@ func (s *jobLister) Jobs(namespace string) JobNamespaceLister {
 type JobNamespaceLister interface {
 	// List lists all Jobs in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*batchv1.Job, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*batchv1.Job, err error)
 	// Get retrieves the Job from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*batchv1.Job, error)
+	Get(ctx context.Context, name string) (*batchv1.Job, error)
 	JobNamespaceListerExpansion
 }
 

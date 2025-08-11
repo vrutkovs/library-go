@@ -17,6 +17,7 @@ limitations under the License.
 package synctrack
 
 import (
+	"context"
 	"sync"
 	"sync/atomic"
 )
@@ -24,7 +25,7 @@ import (
 // Lazy defers the computation of `Evaluate` to when it is necessary. It is
 // possible that Evaluate will be called in parallel from multiple goroutines.
 type Lazy[T any] struct {
-	Evaluate func() (T, error)
+	Evaluate func(ctx context.Context) (T, error)
 
 	cache atomic.Pointer[cacheEntry[T]]
 }
@@ -56,13 +57,13 @@ func (e *cacheEntry[T]) get() (T, error) {
 	return r, err
 }
 
-func (z *Lazy[T]) newCacheEntry() *cacheEntry[T] {
-	return &cacheEntry[T]{eval: z.Evaluate}
+func (z *Lazy[T]) newCacheEntry(ctx context.Context) *cacheEntry[T] {
+	return &cacheEntry[T]{eval: func() (T, error) { return z.Evaluate(ctx) }}
 }
 
 // Notify should be called when something has changed necessitating a new call
 // to Evaluate.
-func (z *Lazy[T]) Notify() { z.cache.Swap(z.newCacheEntry()) }
+func (z *Lazy[T]) Notify(ctx context.Context) { z.cache.Swap(z.newCacheEntry(ctx)) }
 
 // Get should be called to get the current result of a call to Evaluate. If the
 // current cached value is stale (due to a call to Notify), then Evaluate will
@@ -70,13 +71,13 @@ func (z *Lazy[T]) Notify() { z.cache.Swap(z.newCacheEntry()) }
 // Notify), they will all wait for the same return value.
 //
 // Error returns are not cached and will cause multiple calls to evaluate!
-func (z *Lazy[T]) Get() (T, error) {
+func (z *Lazy[T]) Get(ctx context.Context) (T, error) {
 	e := z.cache.Load()
 	if e == nil {
 		// Since we don't force a constructor, nil is a possible value.
 		// If multiple Gets race to set this, the swap makes sure only
 		// one wins.
-		z.cache.CompareAndSwap(nil, z.newCacheEntry())
+		z.cache.CompareAndSwap(nil, z.newCacheEntry(ctx))
 		e = z.cache.Load()
 	}
 	return e.get()

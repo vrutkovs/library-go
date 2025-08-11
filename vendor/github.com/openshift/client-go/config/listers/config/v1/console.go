@@ -7,6 +7,7 @@ import (
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
+	"context"
 )
 
 // ConsoleLister helps list Consoles.
@@ -14,10 +15,10 @@ import (
 type ConsoleLister interface {
 	// List lists all Consoles in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*configv1.Console, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*configv1.Console, err error)
 	// Get retrieves the Console from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*configv1.Console, error)
+	Get(ctx context.Context, name string) (*configv1.Console, error)
 	ConsoleListerExpansion
 }
 

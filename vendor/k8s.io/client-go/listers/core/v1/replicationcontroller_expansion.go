@@ -17,9 +17,10 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
@@ -41,7 +42,7 @@ func (s *replicationControllerLister) GetPodControllers(pod *v1.Pod) ([]*v1.Repl
 		return nil, fmt.Errorf("no controllers found for pod %v because it has no labels", pod.Name)
 	}
 
-	items, err := s.ReplicationControllers(pod.Namespace).List(labels.Everything())
+	items, err := s.ReplicationControllers(pod.Namespace).List(context.Background(), labels.Everything())
 	if err != nil {
 		return nil, err
 	}

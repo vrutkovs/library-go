@@ -19,6 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	"context"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
@@ -30,10 +31,10 @@ import (
 type CSINodeLister interface {
 	// List lists all CSINodes in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*storagev1beta1.CSINode, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*storagev1beta1.CSINode, err error)
 	// Get retrieves the CSINode from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*storagev1beta1.CSINode, error)
+	Get(ctx context.Context, name string) (*storagev1beta1.CSINode, error)
 	CSINodeListerExpansion
 }
 

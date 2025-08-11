@@ -3,6 +3,8 @@
 package v1alpha1
 
 import (
+	"context"
+
 	configv1alpha1 "github.com/openshift/api/config/v1alpha1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
@@ -14,7 +16,7 @@ import (
 type ImagePolicyLister interface {
 	// List lists all ImagePolicies in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*configv1alpha1.ImagePolicy, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*configv1alpha1.ImagePolicy, err error)
 	// ImagePolicies returns an object that can list and get ImagePolicies.
 	ImagePolicies(namespace string) ImagePolicyNamespaceLister
 	ImagePolicyListerExpansion
@@ -40,10 +42,10 @@ func (s *imagePolicyLister) ImagePolicies(namespace string) ImagePolicyNamespace
 type ImagePolicyNamespaceLister interface {
 	// List lists all ImagePolicies in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*configv1alpha1.ImagePolicy, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*configv1alpha1.ImagePolicy, err error)
 	// Get retrieves the ImagePolicy from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*configv1alpha1.ImagePolicy, error)
+	Get(ctx context.Context, name string) (*configv1alpha1.ImagePolicy, error)
 	ImagePolicyNamespaceListerExpansion
 }
 

@@ -3,6 +3,7 @@
 package v1
 
 import (
+	"context"
 	configv1 "github.com/openshift/api/config/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
@@ -14,10 +15,10 @@ import (
 type APIServerLister interface {
 	// List lists all APIServers in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*configv1.APIServer, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*configv1.APIServer, err error)
 	// Get retrieves the APIServer from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*configv1.APIServer, error)
+	Get(ctx context.Context, name string) (*configv1.APIServer, error)
 	APIServerListerExpansion
 }
 

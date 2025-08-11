@@ -124,7 +124,7 @@ func (c *dispatcher) Dispatch(ctx context.Context, a admission.Attributes, o adm
 		var versionedAttr *admission.VersionedAttributes
 
 		definition := hook.Policy
-		matches, matchResource, matchKind, err := c.matcher.DefinitionMatches(a, o, NewValidatingAdmissionPolicyAccessor(definition))
+		matches, matchResource, matchKind, err := c.matcher.DefinitionMatches(ctx, a, o, NewValidatingAdmissionPolicyAccessor(definition))
 		if err != nil {
 			// Configuration error.
 			addConfigError(err, definition, nil)
@@ -143,7 +143,7 @@ func (c *dispatcher) Dispatch(ctx context.Context, a admission.Attributes, o adm
 		for _, binding := range hook.Bindings {
 			// If the key is inside dependentBindings, there is guaranteed to
 			// be a bindingInfo for it
-			matches, err := c.matcher.BindingMatches(a, o, NewValidatingAdmissionPolicyBindingAccessor(binding))
+			matches, err := c.matcher.BindingMatches(ctx, a, o, NewValidatingAdmissionPolicyBindingAccessor(binding))
 			if err != nil {
 				// Configuration error.
 				addConfigError(err, definition, binding)
@@ -154,6 +154,7 @@ func (c *dispatcher) Dispatch(ctx context.Context, a admission.Attributes, o adm
 			}
 
 			params, err := generic.CollectParams(
+				ctx,
 				hook.Policy.Spec.ParamKind,
 				hook.ParamInformer,
 				hook.ParamScope,
@@ -189,7 +190,7 @@ func (c *dispatcher) Dispatch(ctx context.Context, a admission.Attributes, o adm
 			// if it is cluster scoped, namespaceName will be empty
 			// Otherwise, get the Namespace resource.
 			if namespaceName != "" {
-				namespace, err = c.matcher.GetNamespace(namespaceName)
+				namespace, err = c.matcher.GetNamespace(ctx, namespaceName)
 				if err != nil {
 					return err
 				}

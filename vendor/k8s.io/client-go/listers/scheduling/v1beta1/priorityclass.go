@@ -19,6 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	"context"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
@@ -30,10 +31,10 @@ import (
 type PriorityClassLister interface {
 	// List lists all PriorityClasses in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*schedulingv1beta1.PriorityClass, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*schedulingv1beta1.PriorityClass, err error)
 	// Get retrieves the PriorityClass from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*schedulingv1beta1.PriorityClass, error)
+	Get(ctx context.Context, name string) (*schedulingv1beta1.PriorityClass, error)
 	PriorityClassListerExpansion
 }
 

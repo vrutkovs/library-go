@@ -19,6 +19,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
@@ -30,7 +31,7 @@ import (
 type RoleLister interface {
 	// List lists all Roles in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*rbacv1alpha1.Role, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*rbacv1alpha1.Role, err error)
 	// Roles returns an object that can list and get Roles.
 	Roles(namespace string) RoleNamespaceLister
 	RoleListerExpansion
@@ -56,10 +57,10 @@ func (s *roleLister) Roles(namespace string) RoleNamespaceLister {
 type RoleNamespaceLister interface {
 	// List lists all Roles in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*rbacv1alpha1.Role, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*rbacv1alpha1.Role, err error)
 	// Get retrieves the Role from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*rbacv1alpha1.Role, error)
+	Get(ctx context.Context, name string) (*rbacv1alpha1.Role, error)
 	RoleNamespaceListerExpansion
 }
 

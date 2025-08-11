@@ -66,11 +66,11 @@ var (
 	_ admission.Interface                             = &Webhook{}
 )
 
-type sourceFactory func(f informers.SharedInformerFactory) Source
-type dispatcherFactory func(cm *webhookutil.ClientManager) Dispatcher
+type sourceFactory func(ctx context.Context, f informers.SharedInformerFactory) Source
+type dispatcherFactory func(ctx context.Context, cm *webhookutil.ClientManager) Dispatcher
 
 // NewWebhook creates a new generic admission webhook.
-func NewWebhook(handler *admission.Handler, configFile io.Reader, sourceFactory sourceFactory, dispatcherFactory dispatcherFactory) (*Webhook, error) {
+func NewWebhook(ctx context.Context, handler *admission.Handler, configFile io.Reader, sourceFactory sourceFactory, dispatcherFactory dispatcherFactory) (*Webhook, error) {
 	kubeconfigFile, err := config.LoadConfig(configFile)
 	if err != nil {
 		return nil, err
@@ -101,7 +101,7 @@ func NewWebhook(handler *admission.Handler, configFile io.Reader, sourceFactory 
 		clientManager:    &cm,
 		namespaceMatcher: &namespace.Matcher{},
 		objectMatcher:    &object.Matcher{},
-		dispatcher:       dispatcherFactory(&cm),
+		dispatcher:       dispatcherFactory(ctx, &cm),
 		filterCompiler:   cel.NewConditionCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), utilfeature.DefaultFeatureGate.Enabled(features.StrictCostEnforcementForWebhooks))),
 	}, nil
 }
@@ -126,10 +126,10 @@ func (a *Webhook) SetExternalKubeClientSet(client clientset.Interface) {
 }
 
 // SetExternalKubeInformerFactory implements the WantsExternalKubeInformerFactory interface.
-func (a *Webhook) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
+func (a *Webhook) SetExternalKubeInformerFactory(ctx context.Context, f informers.SharedInformerFactory) {
 	namespaceInformer := f.Core().V1().Namespaces()
 	a.namespaceMatcher.NamespaceLister = namespaceInformer.Lister()
-	a.hookSource = a.sourceFactory(f)
+	a.hookSource = a.sourceFactory(ctx, f)
 	a.SetReadyFunc(func() bool {
 		return namespaceInformer.Informer().HasSynced() && a.hookSource.HasSynced()
 	})
@@ -156,7 +156,7 @@ func (a *Webhook) ValidateInitialization() error {
 // ShouldCallHook returns invocation details if the webhook should be called, nil if the webhook should not be called,
 // or an error if an error was encountered during evaluation.
 func (a *Webhook) ShouldCallHook(ctx context.Context, h webhook.WebhookAccessor, attr admission.Attributes, o admission.ObjectInterfaces, v VersionedAttributeAccessor) (*WebhookInvocation, *apierrors.StatusError) {
-	matches, matchNsErr := a.namespaceMatcher.MatchNamespaceSelector(h, attr)
+	matches, matchNsErr := a.namespaceMatcher.MatchNamespaceSelector(ctx, h, attr)
 	// Should not return an error here for webhooks which do not apply to the request, even if err is an unexpected scenario.
 	if !matches && matchNsErr == nil {
 		return nil, nil
@@ -259,6 +259,6 @@ func (a *Webhook) Dispatch(ctx context.Context, attr admission.Attributes, o adm
 	if !a.WaitForReady() {
 		return admission.NewForbidden(attr, fmt.Errorf("not yet ready to handle request"))
 	}
-	hooks := a.hookSource.Webhooks()
+	hooks := a.hookSource.Webhooks(ctx)
 	return a.dispatcher.Dispatch(ctx, attr, o, hooks)
 }

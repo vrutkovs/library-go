@@ -23,6 +23,7 @@ import (
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
+	"context"
 )
 
 // CSIStorageCapacityLister helps list CSIStorageCapacities.
@@ -30,7 +31,7 @@ import (
 type CSIStorageCapacityLister interface {
 	// List lists all CSIStorageCapacities in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*storagev1beta1.CSIStorageCapacity, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*storagev1beta1.CSIStorageCapacity, err error)
 	// CSIStorageCapacities returns an object that can list and get CSIStorageCapacities.
 	CSIStorageCapacities(namespace string) CSIStorageCapacityNamespaceLister
 	CSIStorageCapacityListerExpansion
@@ -56,10 +57,10 @@ func (s *cSIStorageCapacityLister) CSIStorageCapacities(namespace string) CSISto
 type CSIStorageCapacityNamespaceLister interface {
 	// List lists all CSIStorageCapacities in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*storagev1beta1.CSIStorageCapacity, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*storagev1beta1.CSIStorageCapacity, err error)
 	// Get retrieves the CSIStorageCapacity from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*storagev1beta1.CSIStorageCapacity, error)
+	Get(ctx context.Context, name string) (*storagev1beta1.CSIStorageCapacity, error)
 	CSIStorageCapacityNamespaceListerExpansion
 }
 

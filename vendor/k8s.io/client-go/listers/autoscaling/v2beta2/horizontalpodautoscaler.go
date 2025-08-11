@@ -23,6 +23,7 @@ import (
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
+	"context"
 )
 
 // HorizontalPodAutoscalerLister helps list HorizontalPodAutoscalers.
@@ -30,7 +31,7 @@ import (
 type HorizontalPodAutoscalerLister interface {
 	// List lists all HorizontalPodAutoscalers in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*autoscalingv2beta2.HorizontalPodAutoscaler, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*autoscalingv2beta2.HorizontalPodAutoscaler, err error)
 	// HorizontalPodAutoscalers returns an object that can list and get HorizontalPodAutoscalers.
 	HorizontalPodAutoscalers(namespace string) HorizontalPodAutoscalerNamespaceLister
 	HorizontalPodAutoscalerListerExpansion
@@ -56,10 +57,10 @@ func (s *horizontalPodAutoscalerLister) HorizontalPodAutoscalers(namespace strin
 type HorizontalPodAutoscalerNamespaceLister interface {
 	// List lists all HorizontalPodAutoscalers in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*autoscalingv2beta2.HorizontalPodAutoscaler, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*autoscalingv2beta2.HorizontalPodAutoscaler, err error)
 	// Get retrieves the HorizontalPodAutoscaler from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*autoscalingv2beta2.HorizontalPodAutoscaler, error)
+	Get(ctx context.Context, name string) (*autoscalingv2beta2.HorizontalPodAutoscaler, error)
 	HorizontalPodAutoscalerNamespaceListerExpansion
 }
 

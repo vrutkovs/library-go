@@ -117,7 +117,7 @@ func (l *Lifecycle) Admit(ctx context.Context, a admission.Attributes, o admissi
 		err    error
 	)
 
-	namespace, err := l.namespaceLister.Get(a.GetNamespace())
+	namespace, err := l.namespaceLister.Get(ctx, a.GetNamespace())
 	if err != nil {
 		if !errors.IsNotFound(err) {
 			return errors.NewInternalError(err)
@@ -130,7 +130,7 @@ func (l *Lifecycle) Admit(ctx context.Context, a admission.Attributes, o admissi
 		// give the cache time to observe the namespace before rejecting a create.
 		// this helps when creating a namespace and immediately creating objects within it.
 		time.Sleep(missingNamespaceWait)
-		namespace, err = l.namespaceLister.Get(a.GetNamespace())
+		namespace, err = l.namespaceLister.Get(ctx, a.GetNamespace())
 		switch {
 		case errors.IsNotFound(err):
 			// no-op

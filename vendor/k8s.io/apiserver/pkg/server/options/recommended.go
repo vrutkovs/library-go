@@ -17,6 +17,8 @@ limitations under the License.
 package options
 
 import (
+	"context"
+
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
@@ -52,7 +54,7 @@ type RecommendedOptions struct {
 	Traces *TracingOptions
 }
 
-func NewRecommendedOptions(prefix string, codec runtime.Codec) *RecommendedOptions {
+func NewRecommendedOptions(ctx context.Context, prefix string, codec runtime.Codec) *RecommendedOptions {
 	sso := NewSecureServingOptions()
 
 	// We are composing recommended options for an aggregated api-server,
@@ -74,7 +76,7 @@ func NewRecommendedOptions(prefix string, codec runtime.Codec) *RecommendedOptio
 		// across different repos.  Future you will thank you.
 		FeatureGate:                feature.DefaultFeatureGate,
 		ExtraAdmissionInitializers: func(c *server.RecommendedConfig) ([]admission.PluginInitializer, error) { return nil, nil },
-		Admission:                  NewAdmissionOptions(),
+		Admission:                  NewAdmissionOptions(ctx),
 		EgressSelector:             NewEgressSelectorOptions(),
 		Traces:                     NewTracingOptions(),
 	}

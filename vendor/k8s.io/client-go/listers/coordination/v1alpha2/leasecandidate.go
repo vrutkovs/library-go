@@ -23,6 +23,7 @@ import (
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
+	"context"
 )
 
 // LeaseCandidateLister helps list LeaseCandidates.
@@ -30,7 +31,7 @@ import (
 type LeaseCandidateLister interface {
 	// List lists all LeaseCandidates in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*coordinationv1alpha2.LeaseCandidate, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*coordinationv1alpha2.LeaseCandidate, err error)
 	// LeaseCandidates returns an object that can list and get LeaseCandidates.
 	LeaseCandidates(namespace string) LeaseCandidateNamespaceLister
 	LeaseCandidateListerExpansion
@@ -56,10 +57,10 @@ func (s *leaseCandidateLister) LeaseCandidates(namespace string) LeaseCandidateN
 type LeaseCandidateNamespaceLister interface {
 	// List lists all LeaseCandidates in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*coordinationv1alpha2.LeaseCandidate, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*coordinationv1alpha2.LeaseCandidate, err error)
 	// Get retrieves the LeaseCandidate from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*coordinationv1alpha2.LeaseCandidate, error)
+	Get(ctx context.Context, name string) (*coordinationv1alpha2.LeaseCandidate, error)
 	LeaseCandidateNamespaceListerExpansion
 }
 

@@ -23,6 +23,7 @@ import (
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
+	"context"
 )
 
 // IngressLister helps list Ingresses.
@@ -30,7 +31,7 @@ import (
 type IngressLister interface {
 	// List lists all Ingresses in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*networkingv1.Ingress, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*networkingv1.Ingress, err error)
 	// Ingresses returns an object that can list and get Ingresses.
 	Ingresses(namespace string) IngressNamespaceLister
 	IngressListerExpansion
@@ -56,10 +57,10 @@ func (s *ingressLister) Ingresses(namespace string) IngressNamespaceLister {
 type IngressNamespaceLister interface {
 	// List lists all Ingresses in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*networkingv1.Ingress, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*networkingv1.Ingress, err error)
 	// Get retrieves the Ingress from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*networkingv1.Ingress, error)
+	Get(ctx context.Context, name string) (*networkingv1.Ingress, error)
 	IngressNamespaceListerExpansion
 }
 

@@ -23,6 +23,7 @@ import (
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
+	"context"
 )
 
 // SecretLister helps list Secrets.
@@ -30,7 +31,7 @@ import (
 type SecretLister interface {
 	// List lists all Secrets in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*corev1.Secret, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*corev1.Secret, err error)
 	// Secrets returns an object that can list and get Secrets.
 	Secrets(namespace string) SecretNamespaceLister
 	SecretListerExpansion
@@ -56,10 +57,10 @@ func (s *secretLister) Secrets(namespace string) SecretNamespaceLister {
 type SecretNamespaceLister interface {
 	// List lists all Secrets in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*corev1.Secret, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*corev1.Secret, err error)
 	// Get retrieves the Secret from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*corev1.Secret, error)
+	Get(ctx context.Context, name string) (*corev1.Secret, error)
 	SecretNamespaceListerExpansion
 }
 

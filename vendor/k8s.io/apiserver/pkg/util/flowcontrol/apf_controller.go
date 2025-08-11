@@ -368,7 +368,7 @@ func newTestableController(config TestableConfig) *configController {
 	return cfgCtlr
 }
 
-func (cfgCtlr *configController) Run(stopCh <-chan struct{}) error {
+func (cfgCtlr *configController) Run(ctx context.Context, stopCh <-chan struct{}) error {
 	defer utilruntime.HandleCrash()
 
 	// Let the config worker stop when we are done
@@ -380,7 +380,7 @@ func (cfgCtlr *configController) Run(stopCh <-chan struct{}) error {
 	}
 
 	klog.Info("Running API Priority and Fairness config worker")
-	go wait.Until(cfgCtlr.runWorker, time.Second, stopCh)
+	go wait.UntilWithContext(ctx, cfgCtlr.runWorker, time.Second)
 
 	klog.Info("Running API Priority and Fairness periodic rebalancing process")
 	go wait.Until(cfgCtlr.updateBorrowing, borrowingAdjustmentPeriod, stopCh)
@@ -498,14 +498,14 @@ func (cfgCtlr *configController) updateBorrowingLocked(setCompleters bool, plSta
 // runWorker is the logic of the one and only worker goroutine.  We
 // limit the number to one in order to obviate explicit
 // synchronization around access to `cfgCtlr.mostRecentUpdates`.
-func (cfgCtlr *configController) runWorker() {
-	for cfgCtlr.processNextWorkItem() {
+func (cfgCtlr *configController) runWorker(ctx context.Context) {
+	for cfgCtlr.processNextWorkItem(ctx) {
 	}
 }
 
 // processNextWorkItem works on one entry from the work queue.
 // Only invoke this in the one and only worker goroutine.
-func (cfgCtlr *configController) processNextWorkItem() bool {
+func (cfgCtlr *configController) processNextWorkItem(ctx context.Context) bool {
 	obj, shutdown := cfgCtlr.configQueue.Get()
 	if shutdown {
 		return false
@@ -513,7 +513,7 @@ func (cfgCtlr *configController) processNextWorkItem() bool {
 
 	func(obj int) {
 		defer cfgCtlr.configQueue.Done(obj)
-		specificDelay, err := cfgCtlr.syncOne()
+		specificDelay, err := cfgCtlr.syncOne(ctx)
 		switch {
 		case err != nil:
 			klog.Error(err)
@@ -532,14 +532,14 @@ func (cfgCtlr *configController) processNextWorkItem() bool {
 // objects that configure API Priority and Fairness and updates the
 // local configController accordingly.
 // Only invoke this in the one and only worker goroutine
-func (cfgCtlr *configController) syncOne() (specificDelay time.Duration, err error) {
+func (cfgCtlr *configController) syncOne(ctx context.Context) (specificDelay time.Duration, err error) {
 	klog.V(5).Infof("%s syncOne at %s", cfgCtlr.name, cfgCtlr.clock.Now().Format(timeFmt))
 	all := labels.Everything()
-	newPLs, err := cfgCtlr.plLister.List(all)
+	newPLs, err := cfgCtlr.plLister.List(ctx, all)
 	if err != nil {
 		return 0, fmt.Errorf("unable to list PriorityLevelConfiguration objects: %w", err)
 	}
-	newFSs, err := cfgCtlr.fsLister.List(all)
+	newFSs, err := cfgCtlr.fsLister.List(ctx, all)
 	if err != nil {
 		return 0, fmt.Errorf("unable to list FlowSchema objects: %w", err)
 	}

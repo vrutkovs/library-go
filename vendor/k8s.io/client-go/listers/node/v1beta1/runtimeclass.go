@@ -23,6 +23,7 @@ import (
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
+	"context"
 )
 
 // RuntimeClassLister helps list RuntimeClasses.
@@ -30,10 +31,10 @@ import (
 type RuntimeClassLister interface {
 	// List lists all RuntimeClasses in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*nodev1beta1.RuntimeClass, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*nodev1beta1.RuntimeClass, err error)
 	// Get retrieves the RuntimeClass from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*nodev1beta1.RuntimeClass, error)
+	Get(ctx context.Context, name string) (*nodev1beta1.RuntimeClass, error)
 	RuntimeClassListerExpansion
 }
 

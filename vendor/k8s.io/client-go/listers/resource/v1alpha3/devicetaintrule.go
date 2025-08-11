@@ -23,6 +23,7 @@ import (
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
+	"context"
 )
 
 // DeviceTaintRuleLister helps list DeviceTaintRules.
@@ -30,10 +31,10 @@ import (
 type DeviceTaintRuleLister interface {
 	// List lists all DeviceTaintRules in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*resourcev1alpha3.DeviceTaintRule, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*resourcev1alpha3.DeviceTaintRule, err error)
 	// Get retrieves the DeviceTaintRule from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*resourcev1alpha3.DeviceTaintRule, error)
+	Get(ctx context.Context, name string) (*resourcev1alpha3.DeviceTaintRule, error)
 	DeviceTaintRuleListerExpansion
 }
 

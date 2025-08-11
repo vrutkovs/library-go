@@ -3,6 +3,8 @@
 package v1
 
 import (
+	"context"
+
 	quotav1 "github.com/openshift/api/quota/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
@@ -14,7 +16,7 @@ import (
 type AppliedClusterResourceQuotaLister interface {
 	// List lists all AppliedClusterResourceQuotas in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*quotav1.AppliedClusterResourceQuota, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*quotav1.AppliedClusterResourceQuota, err error)
 	// AppliedClusterResourceQuotas returns an object that can list and get AppliedClusterResourceQuotas.
 	AppliedClusterResourceQuotas(namespace string) AppliedClusterResourceQuotaNamespaceLister
 	AppliedClusterResourceQuotaListerExpansion
@@ -40,10 +42,10 @@ func (s *appliedClusterResourceQuotaLister) AppliedClusterResourceQuotas(namespa
 type AppliedClusterResourceQuotaNamespaceLister interface {
 	// List lists all AppliedClusterResourceQuotas in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*quotav1.AppliedClusterResourceQuota, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*quotav1.AppliedClusterResourceQuota, err error)
 	// Get retrieves the AppliedClusterResourceQuota from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*quotav1.AppliedClusterResourceQuota, error)
+	Get(ctx context.Context, name string) (*quotav1.AppliedClusterResourceQuota, error)
 	AppliedClusterResourceQuotaNamespaceListerExpansion
 }
 

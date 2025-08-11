@@ -3,6 +3,8 @@
 package v1
 
 import (
+	"context"
+
 	configv1 "github.com/openshift/api/config/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
@@ -14,10 +16,10 @@ import (
 type ProxyLister interface {
 	// List lists all Proxies in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*configv1.Proxy, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*configv1.Proxy, err error)
 	// Get retrieves the Proxy from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*configv1.Proxy, error)
+	Get(ctx context.Context, name string) (*configv1.Proxy, error)
 	ProxyListerExpansion
 }
 

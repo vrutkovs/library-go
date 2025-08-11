@@ -31,9 +31,9 @@ const (
 )
 
 // Register registers a plugin
-func Register(plugins *admission.Plugins) {
+func Register(ctx context.Context, plugins *admission.Plugins) {
 	plugins.Register(PluginName, func(configFile io.Reader) (admission.Interface, error) {
-		plugin, err := NewValidatingAdmissionWebhook(configFile)
+		plugin, err := NewValidatingAdmissionWebhook(ctx, configFile)
 		if err != nil {
 			return nil, err
 		}
@@ -50,11 +50,11 @@ type Plugin struct {
 var _ admission.ValidationInterface = &Plugin{}
 
 // NewValidatingAdmissionWebhook returns a generic admission webhook plugin.
-func NewValidatingAdmissionWebhook(configFile io.Reader) (*Plugin, error) {
+func NewValidatingAdmissionWebhook(ctx context.Context, configFile io.Reader) (*Plugin, error) {
 	handler := admission.NewHandler(admission.Connect, admission.Create, admission.Delete, admission.Update)
 	p := &Plugin{}
 	var err error
-	p.Webhook, err = generic.NewWebhook(handler, configFile, configuration.NewValidatingWebhookConfigurationManager, newValidatingDispatcher(p))
+	p.Webhook, err = generic.NewWebhook(ctx, handler, configFile, configuration.NewValidatingWebhookConfigurationManager, newValidatingDispatcher(p))
 	if err != nil {
 		return nil, err
 	}

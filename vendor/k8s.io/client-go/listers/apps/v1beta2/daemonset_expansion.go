@@ -17,10 +17,11 @@ limitations under the License.
 package v1beta2
 
 import (
+	"context"
 	"fmt"
 
 	apps "k8s.io/api/apps/v1beta2"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -47,7 +48,7 @@ func (s *daemonSetLister) GetPodDaemonSets(pod *v1.Pod) ([]*apps.DaemonSet, erro
 		return nil, fmt.Errorf("no daemon sets found for pod %v because it has no labels", pod.Name)
 	}
 
-	list, err := s.DaemonSets(pod.Namespace).List(labels.Everything())
+	list, err := s.DaemonSets(pod.Namespace).List(context.Background(), labels.Everything())
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +88,7 @@ func (s *daemonSetLister) GetHistoryDaemonSets(history *apps.ControllerRevision)
 		return nil, fmt.Errorf("no DaemonSet found for ControllerRevision %s because it has no labels", history.Name)
 	}
 
-	list, err := s.DaemonSets(history.Namespace).List(labels.Everything())
+	list, err := s.DaemonSets(history.Namespace).List(context.Background(), labels.Everything())
 	if err != nil {
 		return nil, err
 	}

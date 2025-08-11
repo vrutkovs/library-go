@@ -23,6 +23,7 @@ import (
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
+	"context"
 )
 
 // PodDisruptionBudgetLister helps list PodDisruptionBudgets.
@@ -30,7 +31,7 @@ import (
 type PodDisruptionBudgetLister interface {
 	// List lists all PodDisruptionBudgets in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*policyv1.PodDisruptionBudget, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*policyv1.PodDisruptionBudget, err error)
 	// PodDisruptionBudgets returns an object that can list and get PodDisruptionBudgets.
 	PodDisruptionBudgets(namespace string) PodDisruptionBudgetNamespaceLister
 	PodDisruptionBudgetListerExpansion
@@ -56,10 +57,10 @@ func (s *podDisruptionBudgetLister) PodDisruptionBudgets(namespace string) PodDi
 type PodDisruptionBudgetNamespaceLister interface {
 	// List lists all PodDisruptionBudgets in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*policyv1.PodDisruptionBudget, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*policyv1.PodDisruptionBudget, err error)
 	// Get retrieves the PodDisruptionBudget from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*policyv1.PodDisruptionBudget, error)
+	Get(ctx context.Context, name string) (*policyv1.PodDisruptionBudget, error)
 	PodDisruptionBudgetNamespaceListerExpansion
 }
 

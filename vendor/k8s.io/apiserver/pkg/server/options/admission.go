@@ -17,6 +17,7 @@ limitations under the License.
 package options
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -83,7 +84,7 @@ type AdmissionOptions struct {
 //	Provides the list of RecommendedPluginOrder that holds sane values
 //	that can be used by servers that don't care about admission chain.
 //	Servers that do care can overwrite/append that field after creation.
-func NewAdmissionOptions() *AdmissionOptions {
+func NewAdmissionOptions(ctx context.Context) *AdmissionOptions {
 	options := &AdmissionOptions{
 		Plugins:    admission.NewPlugins(),
 		Decorators: admission.Decorators{admission.DecoratorFunc(admissionmetrics.WithControllerMetrics)},
@@ -94,7 +95,7 @@ func NewAdmissionOptions() *AdmissionOptions {
 		RecommendedPluginOrder: []string{lifecycle.PluginName, mutatingadmissionpolicy.PluginName, mutatingwebhook.PluginName, validatingadmissionpolicy.PluginName, validatingwebhook.PluginName},
 		DefaultOffPlugins:      sets.Set[string]{},
 	}
-	server.RegisterAllAdmissionPlugins(options.Plugins)
+	server.RegisterAllAdmissionPlugins(ctx, options.Plugins)
 	return options
 }
 

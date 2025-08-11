@@ -23,6 +23,7 @@ import (
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
+	"context"
 )
 
 // MutatingAdmissionPolicyBindingLister helps list MutatingAdmissionPolicyBindings.
@@ -30,10 +31,10 @@ import (
 type MutatingAdmissionPolicyBindingLister interface {
 	// List lists all MutatingAdmissionPolicyBindings in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*admissionregistrationv1alpha1.MutatingAdmissionPolicyBinding, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*admissionregistrationv1alpha1.MutatingAdmissionPolicyBinding, err error)
 	// Get retrieves the MutatingAdmissionPolicyBinding from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*admissionregistrationv1alpha1.MutatingAdmissionPolicyBinding, error)
+	Get(ctx context.Context, name string) (*admissionregistrationv1alpha1.MutatingAdmissionPolicyBinding, error)
 	MutatingAdmissionPolicyBindingListerExpansion
 }
 

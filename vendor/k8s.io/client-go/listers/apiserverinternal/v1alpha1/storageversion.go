@@ -23,6 +23,7 @@ import (
 	labels "k8s.io/apimachinery/pkg/labels"
 	listers "k8s.io/client-go/listers"
 	cache "k8s.io/client-go/tools/cache"
+	"context"
 )
 
 // StorageVersionLister helps list StorageVersions.
@@ -30,10 +31,10 @@ import (
 type StorageVersionLister interface {
 	// List lists all StorageVersions in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*apiserverinternalv1alpha1.StorageVersion, err error)
+	List(ctx context.Context, selector labels.Selector) (ret []*apiserverinternalv1alpha1.StorageVersion, err error)
 	// Get retrieves the StorageVersion from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*apiserverinternalv1alpha1.StorageVersion, error)
+	Get(ctx context.Context, name string) (*apiserverinternalv1alpha1.StorageVersion, error)
 	StorageVersionListerExpansion
 }
 

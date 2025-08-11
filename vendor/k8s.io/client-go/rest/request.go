@@ -52,6 +52,9 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
+
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -1309,6 +1312,17 @@ func (r *Request) Do(ctx context.Context) Result {
 	return result
 }
 
+func (r *Request) Trace(ctx context.Context, span trace.Span, msg string) *Request {
+	span.AddEvent(msg)
+	for k, values := range r.headers {
+		key := fmt.Sprintf("request-%s", k)
+		for _, v := range values {
+			span.SetAttributes(attribute.String(key, v))
+		}
+	}
+	return r
+}
+
 // DoRaw executes the request but does not process the response body.
 func (r *Request) DoRaw(ctx context.Context) ([]byte, error) {
 	logger := klog.FromContext(ctx)
@@ -1395,6 +1409,7 @@ func (r *Request) transformResponse(ctx context.Context, resp *http.Response, re
 				contentType: contentType,
 				statusCode:  resp.StatusCode,
 				warnings:    handleWarnings(ctx, resp.Header, r.warningHandler),
+				headers:     resp.Header,
 				logger:      logger,
 			}
 		}
@@ -1415,6 +1430,7 @@ func (r *Request) transformResponse(ctx context.Context, resp *http.Response, re
 			decoder:     decoder,
 			err:         err,
 			warnings:    handleWarnings(ctx, resp.Header, r.warningHandler),
+			headers:     resp.Header,
 			logger:      logger,
 		}
 	}
@@ -1425,6 +1441,7 @@ func (r *Request) transformResponse(ctx context.Context, resp *http.Response, re
 		statusCode:  resp.StatusCode,
 		decoder:     decoder,
 		warnings:    handleWarnings(ctx, resp.Header, r.warningHandler),
+		headers:     resp.Header,
 		logger:      logger,
 	}
 }
@@ -1556,6 +1573,7 @@ type Result struct {
 	err         error
 	statusCode  int
 	logger      klog.Logger
+	headers     http.Header
 
 	decoder runtime.Decoder
 }
@@ -1604,6 +1622,17 @@ func (r Result) StatusCode(statusCode *int) Result {
 // error code was returned.)
 func (r Result) ContentType(contentType *string) Result {
 	*contentType = r.contentType
+	return r
+}
+
+func (r Result) Trace(ctx context.Context, span trace.Span, msg string) Result {
+	span.AddEvent(msg)
+	for k, values := range r.headers {
+		key := fmt.Sprintf("response-%s", k)
+		for _, v := range values {
+			span.SetAttributes(attribute.String(key, v))
+		}
+	}
 	return r
 }
 
