@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"runtime"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -127,7 +128,10 @@ func (c *dynamicResourceClient) Namespace(ns string) ResourceInterface {
 
 func (c *dynamicResourceClient) Create(ctx context.Context, obj *unstructured.Unstructured, opts metav1.CreateOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	tracer := otel.GetTracerProvider().Tracer("client-go")
+	pc, _, _, _ := runtime.Caller(1)
+	file, line := runtime.FuncForPC(pc).FileLine(pc)
 	ctx, span := tracer.Start(ctx, fmt.Sprintf("dynamicResourceClient.%s.Create", c.resource), trace.WithAttributes(
+		attribute.String("location", fmt.Sprintf("%s:%d", file, line)),
 		attribute.String("namespace", c.namespace),
 	))
 	defer span.End()
@@ -164,7 +168,10 @@ func (c *dynamicResourceClient) Create(ctx context.Context, obj *unstructured.Un
 
 func (c *dynamicResourceClient) Update(ctx context.Context, obj *unstructured.Unstructured, opts metav1.UpdateOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	tracer := otel.GetTracerProvider().Tracer("client-go")
+	pc, _, _, _ := runtime.Caller(1)
+	file, line := runtime.FuncForPC(pc).FileLine(pc)
 	ctx, span := tracer.Start(ctx, fmt.Sprintf("dynamicResourceClient.%s.Update", c.resource), trace.WithAttributes(
+		attribute.String("location", fmt.Sprintf("%s:%d", file, line)),
 		attribute.String("namespace", c.namespace),
 	))
 	defer span.End()
@@ -198,7 +205,10 @@ func (c *dynamicResourceClient) Update(ctx context.Context, obj *unstructured.Un
 
 func (c *dynamicResourceClient) UpdateStatus(ctx context.Context, obj *unstructured.Unstructured, opts metav1.UpdateOptions) (*unstructured.Unstructured, error) {
 	tracer := otel.GetTracerProvider().Tracer("client-go")
+	pc, _, _, _ := runtime.Caller(1)
+	file, line := runtime.FuncForPC(pc).FileLine(pc)
 	ctx, span := tracer.Start(ctx, fmt.Sprintf("dynamicResourceClient.%s.UpdateStatus", c.resource), trace.WithAttributes(
+		attribute.String("location", fmt.Sprintf("%s:%d", file, line)),
 		attribute.String("namespace", c.namespace),
 	))
 	defer span.End()
@@ -232,7 +242,10 @@ func (c *dynamicResourceClient) UpdateStatus(ctx context.Context, obj *unstructu
 
 func (c *dynamicResourceClient) Delete(ctx context.Context, name string, opts metav1.DeleteOptions, subresources ...string) error {
 	tracer := otel.GetTracerProvider().Tracer("client-go")
+	pc, _, _, _ := runtime.Caller(1)
+	file, line := runtime.FuncForPC(pc).FileLine(pc)
 	ctx, span := tracer.Start(ctx, fmt.Sprintf("dynamicResourceClient.%s.Delete", c.resource), trace.WithAttributes(
+		attribute.String("location", fmt.Sprintf("%s:%d", file, line)),
 		attribute.String("namespace", c.namespace),
 	))
 	defer span.End()
@@ -269,7 +282,10 @@ func (c *dynamicResourceClient) DeleteCollection(ctx context.Context, opts metav
 
 func (c *dynamicResourceClient) Get(ctx context.Context, name string, opts metav1.GetOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	tracer := otel.GetTracerProvider().Tracer("client-go")
+	pc, _, _, _ := runtime.Caller(1)
+	file, line := runtime.FuncForPC(pc).FileLine(pc)
 	ctx, span := tracer.Start(ctx, fmt.Sprintf("dynamicResourceClient.%s.Get", c.resource), trace.WithAttributes(
+		attribute.String("location", fmt.Sprintf("%s:%d", file, line)),
 		attribute.String("name", name),
 		attribute.String("namespace", c.namespace),
 	))
@@ -295,19 +311,22 @@ func (c *dynamicResourceClient) Get(ctx context.Context, name string, opts metav
 
 func (c *dynamicResourceClient) List(ctx context.Context, opts metav1.ListOptions) (*unstructured.UnstructuredList, error) {
 	tracer := otel.GetTracerProvider().Tracer("client-go")
+	pc, _, _, _ := runtime.Caller(1)
+	file, line := runtime.FuncForPC(pc).FileLine(pc)
 	ctx, span := tracer.Start(ctx, fmt.Sprintf("dynamicResourceClient.%s.List", c.resource), trace.WithAttributes(
+		attribute.String("location", fmt.Sprintf("%s:%d", file, line)),
 		attribute.String("namespace", c.namespace),
 	))
 	defer span.End()
 	if watchListOptions, hasWatchListOptionsPrepared, watchListOptionsErr := watchlist.PrepareWatchListOptionsFromListOptions(opts); watchListOptionsErr != nil {
-		klog.Warningf("Failed preparing watchlist options for %v, falling back to the standard LIST semantics, err = %v", c.resource, watchListOptionsErr)
+		klog.WarningfWithCtx(ctx, "Failed preparing watchlist options for %v, falling back to the standard LIST semantics, err = %v", c.resource, watchListOptionsErr)
 	} else if hasWatchListOptionsPrepared {
 		result, err := c.watchList(ctx, watchListOptions)
 		if err == nil {
 			consistencydetector.CheckWatchListFromCacheDataConsistencyIfRequested(ctx, fmt.Sprintf("watchlist request for %v", c.resource), c.list, opts, result)
 			return result, nil
 		}
-		klog.Warningf("The watchlist request for %v ended with an error, falling back to the standard LIST semantics, err = %v", c.resource, err)
+		klog.WarningfWithCtx(ctx, "The watchlist request for %v ended with an error, falling back to the standard LIST semantics, err = %v", c.resource, err)
 	}
 	result, err := c.list(ctx, opts)
 	if err == nil {
@@ -364,7 +383,10 @@ func (c *dynamicResourceClient) Watch(ctx context.Context, opts metav1.ListOptio
 
 func (c *dynamicResourceClient) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	tracer := otel.GetTracerProvider().Tracer("client-go")
+	pc, _, _, _ := runtime.Caller(1)
+	file, line := runtime.FuncForPC(pc).FileLine(pc)
 	ctx, span := tracer.Start(ctx, fmt.Sprintf("dynamicResourceClient.%s.Patch", c.resource), trace.WithAttributes(
+		attribute.String("location", fmt.Sprintf("%s:%d", file, line)),
 		attribute.String("name", name),
 		attribute.String("namespace", c.namespace),
 	))
@@ -389,7 +411,10 @@ func (c *dynamicResourceClient) Patch(ctx context.Context, name string, pt types
 
 func (c *dynamicResourceClient) Apply(ctx context.Context, name string, obj *unstructured.Unstructured, opts metav1.ApplyOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	tracer := otel.GetTracerProvider().Tracer("client-go")
+	pc, _, _, _ := runtime.Caller(1)
+	file, line := runtime.FuncForPC(pc).FileLine(pc)
 	ctx, span := tracer.Start(ctx, fmt.Sprintf("dynamicResourceClient.%s.Apply", c.resource), trace.WithAttributes(
+		attribute.String("location", fmt.Sprintf("%s:%d", file, line)),
 		attribute.String("name", name),
 		attribute.String("namespace", c.namespace),
 	))

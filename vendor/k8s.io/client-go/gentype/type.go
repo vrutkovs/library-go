@@ -19,6 +19,7 @@ package gentype
 import (
 	"context"
 	"fmt"
+	goruntime "runtime"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -163,7 +164,10 @@ func (c *Client[T]) GetNamespace() string {
 // Get takes name of the resource, and returns the corresponding object, and an error if there is any.
 func (c *Client[T]) Get(ctx context.Context, name string, options metav1.GetOptions) (T, error) {
 	tracer := otel.GetTracerProvider().Tracer("client-go")
+	pc, _, _, _ := goruntime.Caller(1)
+	file, line := goruntime.FuncForPC(pc).FileLine(pc)
 	ctx, span := tracer.Start(ctx, fmt.Sprintf("%s.Get", c.resource), trace.WithAttributes(
+		attribute.String("location", fmt.Sprintf("%s:%d", file, line)),
 		attribute.String("name", name),
 		attribute.String("namespace", c.namespace),
 	))
@@ -186,14 +190,14 @@ func (c *Client[T]) Get(ctx context.Context, name string, options metav1.GetOpti
 // List takes label and field selectors, and returns the list of resources that match those selectors.
 func (l *alsoLister[T, L]) List(ctx context.Context, opts metav1.ListOptions) (L, error) {
 	if watchListOptions, hasWatchListOptionsPrepared, watchListOptionsErr := watchlist.PrepareWatchListOptionsFromListOptions(opts); watchListOptionsErr != nil {
-		klog.Warningf("Failed preparing watchlist options for $.type|resource$, falling back to the standard LIST semantics, err = %v", watchListOptionsErr)
+		klog.WarningfWithCtx(ctx, "Failed preparing watchlist options for $.type|resource$, falling back to the standard LIST semantics, err = %v", watchListOptionsErr)
 	} else if hasWatchListOptionsPrepared {
 		result, err := l.watchList(ctx, watchListOptions)
 		if err == nil {
 			consistencydetector.CheckWatchListFromCacheDataConsistencyIfRequested(ctx, "watchlist request for "+l.client.resource, l.list, opts, result)
 			return result, nil
 		}
-		klog.Warningf("The watchlist request for %s ended with an error, falling back to the standard LIST semantics, err = %v", l.client.resource, err)
+		klog.WarningfWithCtx(ctx, "The watchlist request for %s ended with an error, falling back to the standard LIST semantics, err = %v", l.client.resource, err)
 	}
 	result, err := l.list(ctx, opts)
 	if err == nil {
@@ -204,7 +208,10 @@ func (l *alsoLister[T, L]) List(ctx context.Context, opts metav1.ListOptions) (L
 
 func (l *alsoLister[T, L]) list(ctx context.Context, opts metav1.ListOptions) (L, error) {
 	tracer := otel.GetTracerProvider().Tracer("client-go")
+	pc, _, _, _ := goruntime.Caller(1)
+	file, line := goruntime.FuncForPC(pc).FileLine(pc)
 	ctx, span := tracer.Start(ctx, fmt.Sprintf("%s.List", l.client.resource), trace.WithAttributes(
+		attribute.String("location", fmt.Sprintf("%s:%d", file, line)),
 		attribute.String("namespace", l.client.namespace),
 	))
 	defer span.End()
@@ -264,7 +271,10 @@ func (c *Client[T]) Watch(ctx context.Context, opts metav1.ListOptions) (watch.I
 // Create takes the representation of a resource and creates it.  Returns the server's representation of the resource, and an error, if there is any.
 func (c *Client[T]) Create(ctx context.Context, obj T, opts metav1.CreateOptions) (T, error) {
 	tracer := otel.GetTracerProvider().Tracer("client-go")
+	pc, _, _, _ := goruntime.Caller(1)
+	file, line := goruntime.FuncForPC(pc).FileLine(pc)
 	ctx, span := tracer.Start(ctx, fmt.Sprintf("%s.Create", c.resource), trace.WithAttributes(
+		attribute.String("location", fmt.Sprintf("%s:%d", file, line)),
 		attribute.String("namespace", c.namespace),
 		attribute.String("name", obj.GetName()),
 	))
@@ -287,7 +297,10 @@ func (c *Client[T]) Create(ctx context.Context, obj T, opts metav1.CreateOptions
 // Update takes the representation of a resource and updates it. Returns the server's representation of the resource, and an error, if there is any.
 func (c *Client[T]) Update(ctx context.Context, obj T, opts metav1.UpdateOptions) (T, error) {
 	tracer := otel.GetTracerProvider().Tracer("client-go")
+	pc, _, _, _ := goruntime.Caller(1)
+	file, line := goruntime.FuncForPC(pc).FileLine(pc)
 	ctx, span := tracer.Start(ctx, fmt.Sprintf("%s.Update", c.resource), trace.WithAttributes(
+		attribute.String("location", fmt.Sprintf("%s:%d", file, line)),
 		attribute.String("namespace", c.namespace),
 		attribute.String("name", obj.GetName()),
 	))
@@ -311,7 +324,10 @@ func (c *Client[T]) Update(ctx context.Context, obj T, opts metav1.UpdateOptions
 // UpdateStatus updates the status subresource of a resource. Returns the server's representation of the resource, and an error, if there is any.
 func (c *Client[T]) UpdateStatus(ctx context.Context, obj T, opts metav1.UpdateOptions) (T, error) {
 	tracer := otel.GetTracerProvider().Tracer("client-go")
+	pc, _, _, _ := goruntime.Caller(1)
+	file, line := goruntime.FuncForPC(pc).FileLine(pc)
 	ctx, span := tracer.Start(ctx, fmt.Sprintf("%s.UpdateStatus", c.resource), trace.WithAttributes(
+		attribute.String("location", fmt.Sprintf("%s:%d", file, line)),
 		attribute.String("namespace", c.namespace),
 		attribute.String("name", obj.GetName()),
 	))
@@ -336,7 +352,10 @@ func (c *Client[T]) UpdateStatus(ctx context.Context, obj T, opts metav1.UpdateO
 // Delete takes name of the resource and deletes it. Returns an error if one occurs.
 func (c *Client[T]) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	tracer := otel.GetTracerProvider().Tracer("client-go")
+	pc, _, _, _ := goruntime.Caller(1)
+	file, line := goruntime.FuncForPC(pc).FileLine(pc)
 	ctx, span := tracer.Start(ctx, fmt.Sprintf("%s.Delete", c.resource), trace.WithAttributes(
+		attribute.String("location", fmt.Sprintf("%s:%d", file, line)),
 		attribute.String("namespace", c.namespace),
 		attribute.String("name", name),
 	))
@@ -374,7 +393,10 @@ func (l *alsoLister[T, L]) DeleteCollection(ctx context.Context, opts metav1.Del
 // Patch applies the patch and returns the patched resource.
 func (c *Client[T]) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (T, error) {
 	tracer := otel.GetTracerProvider().Tracer("client-go")
+	pc, _, _, _ := goruntime.Caller(1)
+	file, line := goruntime.FuncForPC(pc).FileLine(pc)
 	ctx, span := tracer.Start(ctx, fmt.Sprintf("%s.Patch", c.resource), trace.WithAttributes(
+		attribute.String("location", fmt.Sprintf("%s:%d", file, line)),
 		attribute.String("namespace", c.namespace),
 		attribute.String("name", name),
 	))
@@ -399,7 +421,10 @@ func (c *Client[T]) Patch(ctx context.Context, name string, pt types.PatchType, 
 // Apply takes the given apply declarative configuration, applies it and returns the applied resource.
 func (a *alsoApplier[T, C]) Apply(ctx context.Context, obj C, opts metav1.ApplyOptions) (T, error) {
 	tracer := otel.GetTracerProvider().Tracer("client-go")
+	pc, _, _, _ := goruntime.Caller(1)
+	file, line := goruntime.FuncForPC(pc).FileLine(pc)
 	ctx, span := tracer.Start(ctx, fmt.Sprintf("%s.Apply", a.client.resource), trace.WithAttributes(
+		attribute.String("location", fmt.Sprintf("%s:%d", file, line)),
 		attribute.String("namespace", a.client.namespace),
 		attribute.String("name", *obj.GetName()),
 	))
@@ -435,7 +460,10 @@ func (a *alsoApplier[T, C]) Apply(ctx context.Context, obj C, opts metav1.ApplyO
 // Apply takes the given apply declarative configuration, applies it to the status subresource and returns the applied resource.
 func (a *alsoApplier[T, C]) ApplyStatus(ctx context.Context, obj C, opts metav1.ApplyOptions) (T, error) {
 	tracer := otel.GetTracerProvider().Tracer("client-go")
+	pc, _, _, _ := goruntime.Caller(1)
+	file, line := goruntime.FuncForPC(pc).FileLine(pc)
 	ctx, span := tracer.Start(ctx, fmt.Sprintf("%s.ApplyStatus", a.client.resource), trace.WithAttributes(
+		attribute.String("location", fmt.Sprintf("%s:%d", file, line)),
 		attribute.String("namespace", a.client.namespace),
 		attribute.String("name", *obj.GetName()),
 	))

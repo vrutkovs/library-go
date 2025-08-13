@@ -93,6 +93,7 @@ package klog
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -108,6 +109,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"k8s.io/klog/v2/internal/buffer"
 	"k8s.io/klog/v2/internal/clock"
 	"k8s.io/klog/v2/internal/dbg"
@@ -809,16 +812,21 @@ func (l *loggingT) infoS(logger *logWriter, filter LogFilter, depth int, msg str
 // printS is called from infoS and errorS if logger is not specified.
 // set log severity by s
 func (l *loggingT) printS(err error, s severity.Severity, depth int, msg string, keysAndValues ...interface{}) {
-	// Only create a new buffer if we don't have one cached.
-	b := buffer.GetBuffer()
 	// The message is always quoted, even if it contains line breaks.
 	// If developers want multi-line output, they should use a small, fixed
 	// message and put the multi-line output into a value.
-	b.WriteString(strconv.Quote(msg))
+	qMsg := make([]byte, 0, 1024)
+	qMsg = strconv.AppendQuote(qMsg, msg)
+
+	// Only create a new buffer if we don't have one cached.
+	b := buffer.GetBuffer()
+	b.Write(qMsg)
+
+	var errKV []interface{}
 	if err != nil {
-		serialize.KVListFormat(&b.Buffer, "err", err)
+		errKV = []interface{}{"err", err}
 	}
-	serialize.KVListFormat(&b.Buffer, keysAndValues...)
+	serialize.FormatKVs(&b.Buffer, errKV, keysAndValues)
 	l.printDepth(s, nil, nil, depth+1, &b.Buffer)
 	// Make the buffer available for reuse.
 	buffer.PutBuffer(b)
@@ -1438,6 +1446,20 @@ func (v Verbose) Infof(format string, args ...interface{}) {
 	}
 }
 
+// Infof is equivalent to the global Infof function, guarded by the value of v.
+// See the documentation of V for usage.
+func (v Verbose) InfofWithCtx(ctx context.Context, format string, args ...interface{}) {
+	span := trace.SpanFromContext(ctx)
+	pc, _, _, _ := runtime.Caller(1)
+	file, line := runtime.FuncForPC(pc).FileLine(pc)
+	span.AddEvent("message", trace.WithAttributes(
+		attribute.String("message", fmt.Sprintf(format, args...)),
+		attribute.String("level", "info"),
+		attribute.String("location", fmt.Sprintf("%s:%d", file, line)),
+	))
+	v.Infof(format, args...)
+}
+
 // InfofDepth is equivalent to the global InfofDepth function, guarded by the value of v.
 // See the documentation of V for usage.
 func (v Verbose) InfofDepth(depth int, format string, args ...interface{}) {
@@ -1513,6 +1535,20 @@ func Infof(format string, args ...interface{}) {
 	logging.printf(severity.InfoLog, logging.logger, logging.filter, format, args...)
 }
 
+// Infof logs to the INFO log.
+// Arguments are handled in the manner of fmt.Printf; a newline is appended if missing.
+func InfofWithCtx(ctx context.Context, format string, args ...interface{}) {
+	span := trace.SpanFromContext(ctx)
+	pc, _, _, _ := runtime.Caller(1)
+	file, line := runtime.FuncForPC(pc).FileLine(pc)
+	span.AddEvent("message", trace.WithAttributes(
+		attribute.String("message", fmt.Sprintf(format, args...)),
+		attribute.String("level", "info"),
+		attribute.String("location", fmt.Sprintf("%s:%d", file, line)),
+	))
+	Infof(format, args...)
+}
+
 // InfofDepth acts as Infof but uses depth to determine which call frame to log.
 // InfofDepth(0, "msg", args...) is the same as Infof("msg", args...).
 func InfofDepth(depth int, format string, args ...interface{}) {
@@ -1561,6 +1597,20 @@ func Warningf(format string, args ...interface{}) {
 	logging.printf(severity.WarningLog, logging.logger, logging.filter, format, args...)
 }
 
+// Warningf logs to the WARNING and INFO logs.
+// Arguments are handled in the manner of fmt.Printf; a newline is appended if missing.
+func WarningfWithCtx(ctx context.Context, format string, args ...interface{}) {
+	span := trace.SpanFromContext(ctx)
+	pc, _, _, _ := runtime.Caller(1)
+	file, line := runtime.FuncForPC(pc).FileLine(pc)
+	span.AddEvent("message", trace.WithAttributes(
+		attribute.String("message", fmt.Sprintf(format, args...)),
+		attribute.String("level", "warning"),
+		attribute.String("location", fmt.Sprintf("%s:%d", file, line)),
+	))
+	Warningf(format, args...)
+}
+
 // WarningfDepth acts as Warningf but uses depth to determine which call frame to log.
 // WarningfDepth(0, "msg", args...) is the same as Warningf("msg", args...).
 func WarningfDepth(depth int, format string, args ...interface{}) {
@@ -1595,6 +1645,20 @@ func ErrorlnDepth(depth int, args ...interface{}) {
 // Arguments are handled in the manner of fmt.Printf; a newline is appended if missing.
 func Errorf(format string, args ...interface{}) {
 	logging.printf(severity.ErrorLog, logging.logger, logging.filter, format, args...)
+}
+
+// Errorf logs to the ERROR, WARNING, and INFO logs.
+// Arguments are handled in the manner of fmt.Printf; a newline is appended if missing.
+func ErrorfWithCtx(ctx context.Context, format string, args ...interface{}) {
+	span := trace.SpanFromContext(ctx)
+	pc, _, _, _ := runtime.Caller(1)
+	file, line := runtime.FuncForPC(pc).FileLine(pc)
+	span.AddEvent("message", trace.WithAttributes(
+		attribute.String("message", fmt.Sprintf(format, args...)),
+		attribute.String("level", "error"),
+		attribute.String("location", fmt.Sprintf("%s:%d", file, line)),
+	))
+	Errorf(format, args...)
 }
 
 // ErrorfDepth acts as Errorf but uses depth to determine which call frame to log.
@@ -1664,6 +1728,27 @@ func FatallnDepth(depth int, args ...interface{}) {
 // Arguments are handled in the manner of fmt.Printf; a newline is appended if missing.
 func Fatalf(format string, args ...interface{}) {
 	logging.printf(severity.FatalLog, logging.logger, logging.filter, format, args...)
+}
+
+func FatalfWithCtx(ctx context.Context, format string, args ...interface{}) {
+	span := trace.SpanFromContext(ctx)
+	pc, _, _, _ := runtime.Caller(1)
+	file, line := runtime.FuncForPC(pc).FileLine(pc)
+	span.AddEvent("message", trace.WithAttributes(
+		attribute.String("message", fmt.Sprintf(format, args...)),
+		attribute.String("level", "fatal"),
+		attribute.String("location", fmt.Sprintf("%s:%d", file, line)),
+	))
+	Fatalf(format, args...)
+}
+
+// RecordError will record err as an exception span event for this span.
+// If this span is not being recorded or err is nil then this method does nothing.
+func RecordError(ctx context.Context, err error, attributes ...attribute.KeyValue) {
+	span := trace.SpanFromContext(ctx)
+	if err != nil {
+		span.RecordError(err, trace.WithAttributes(attributes...))
+	}
 }
 
 // FatalfDepth acts as Fatalf but uses depth to determine which call frame to log.

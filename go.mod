@@ -135,12 +135,11 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.6.0 // indirect
 )
 
-replace k8s.io/client-go => github.com/vrutkovs/client-go v0.0.0-20250812081323-f2c002b6ea8f
-
-replace k8s.io/apiserver => github.com/vrutkovs/apiserver v0.0.0-20250812081447-8cb82bbdd044
-
-replace k8s.io/apiextensions-apiserver => github.com/vrutkovs/apiextensions-apiserver v0.0.0-20250812082223-6b92852167cf
-
-replace github.com/openshift/client-go => github.com/vrutkovs/openshift-client-go v0.0.0-20250812082558-38e9cc138c53
-
-replace k8s.io/kube-aggregator => github.com/vrutkovs/kube-aggregator v0.0.0-20250812082856-a3f54eada162
+replace (
+	github.com/openshift/client-go => github.com/vrutkovs/openshift-client-go v0.0.0-20250812082558-38e9cc138c53
+	k8s.io/apiextensions-apiserver => github.com/vrutkovs/apiextensions-apiserver v0.0.0-20250812082223-6b92852167cf
+	k8s.io/apiserver => github.com/vrutkovs/apiserver v0.0.0-20250812081447-8cb82bbdd044
+	k8s.io/client-go => github.com/vrutkovs/client-go v0.0.0-20250813113115-b01a4952cc21
+	k8s.io/klog/v2 => github.com/vrutkovs/klog/v2 v2.0.0-20250813113851-0481beef9e99
+	k8s.io/kube-aggregator => github.com/vrutkovs/kube-aggregator v0.0.0-20250812082856-a3f54eada162
+)

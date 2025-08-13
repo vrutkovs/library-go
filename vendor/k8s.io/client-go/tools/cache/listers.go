@@ -18,6 +18,8 @@ package cache
 
 import (
 	"context"
+	"fmt"
+	goruntime "runtime"
 
 	"k8s.io/klog/v2"
 
@@ -137,8 +139,11 @@ type genericLister struct {
 
 func (s *genericLister) List(ctx context.Context, selector labels.Selector) (ret []runtime.Object, err error) {
 	tracer := otel.GetTracerProvider().Tracer("client-go")
+	pc, _, _, _ := goruntime.Caller(1)
+	file, line := goruntime.FuncForPC(pc).FileLine(pc)
 	ctx, span := tracer.Start(ctx, "genericLister.List", trace.WithAttributes(
 		attribute.String("selector", selector.String()),
+		attribute.String("location", fmt.Sprintf("%s:%d", file, line)),
 	))
 	defer span.End()
 	err = ListAll(s.indexer, selector, func(m interface{}) {
@@ -149,8 +154,11 @@ func (s *genericLister) List(ctx context.Context, selector labels.Selector) (ret
 
 func (s *genericLister) ByNamespace(ctx context.Context, namespace string) GenericNamespaceLister {
 	tracer := otel.GetTracerProvider().Tracer("client-go")
+	pc, _, _, _ := goruntime.Caller(1)
+	file, line := goruntime.FuncForPC(pc).FileLine(pc)
 	ctx, span := tracer.Start(ctx, "genericLister.ByNamespace", trace.WithAttributes(
 		attribute.String("name", namespace),
+		attribute.String("location", fmt.Sprintf("%s:%d", file, line)),
 	))
 	defer span.End()
 	return &genericNamespaceLister{indexer: s.indexer, namespace: namespace, resource: s.resource}
@@ -158,8 +166,11 @@ func (s *genericLister) ByNamespace(ctx context.Context, namespace string) Gener
 
 func (s *genericLister) Get(ctx context.Context, name string) (runtime.Object, error) {
 	tracer := otel.GetTracerProvider().Tracer("client-go")
+	pc, _, _, _ := goruntime.Caller(1)
+	file, line := goruntime.FuncForPC(pc).FileLine(pc)
 	ctx, span := tracer.Start(ctx, "genericLister.Get", trace.WithAttributes(
 		attribute.String("name", name),
+		attribute.String("location", fmt.Sprintf("%s:%d", file, line)),
 	))
 	defer span.End()
 
@@ -181,8 +192,11 @@ type genericNamespaceLister struct {
 
 func (s *genericNamespaceLister) List(ctx context.Context, selector labels.Selector) (ret []runtime.Object, err error) {
 	tracer := otel.GetTracerProvider().Tracer("client-go")
+	pc, _, _, _ := goruntime.Caller(1)
+	file, line := goruntime.FuncForPC(pc).FileLine(pc)
 	ctx, span := tracer.Start(ctx, "genericNamespaceLister.List", trace.WithAttributes(
 		attribute.String("name", selector.String()),
+		attribute.String("location", fmt.Sprintf("%s:%d", file, line)),
 	))
 	defer span.End()
 	err = ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
@@ -193,8 +207,11 @@ func (s *genericNamespaceLister) List(ctx context.Context, selector labels.Selec
 
 func (s *genericNamespaceLister) Get(ctx context.Context, name string) (runtime.Object, error) {
 	tracer := otel.GetTracerProvider().Tracer("client-go")
+	pc, _, _, _ := goruntime.Caller(1)
+	file, line := goruntime.FuncForPC(pc).FileLine(pc)
 	ctx, span := tracer.Start(ctx, "genericNamespaceLister.Get", trace.WithAttributes(
 		attribute.String("name", name),
+		attribute.String("location", fmt.Sprintf("%s:%d", file, line)),
 	))
 	defer span.End()
 

@@ -18,6 +18,8 @@ package dynamiclister
 
 import (
 	"context"
+	"fmt"
+	"runtime"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -46,8 +48,11 @@ func New(indexer cache.Indexer, gvr schema.GroupVersionResource) Lister {
 // List lists all resources in the indexer.
 func (l *dynamicLister) List(ctx context.Context, selector labels.Selector) (ret []*unstructured.Unstructured, err error) {
 	tracer := otel.GetTracerProvider().Tracer("library-go")
+	pc, _, _, _ := runtime.Caller(1)
+	file, line := runtime.FuncForPC(pc).FileLine(pc)
 	ctx, span := tracer.Start(ctx, "dynamicLister.List", trace.WithAttributes(
 		attribute.String("selector", selector.String()),
+		attribute.String("location", fmt.Sprintf("%s:%d", file, line)),
 	))
 	defer span.End()
 
@@ -59,8 +64,11 @@ func (l *dynamicLister) List(ctx context.Context, selector labels.Selector) (ret
 
 // Get retrieves a resource from the indexer with the given name
 func (l *dynamicLister) Get(ctx context.Context, name string) (*unstructured.Unstructured, error) {
-	tracer := otel.GetTracerProvider().Tracer("library-go")
+	tracer := otel.GetTracerProvider().Tracer("client-go")
+	pc, _, _, _ := runtime.Caller(1)
+	file, line := runtime.FuncForPC(pc).FileLine(pc)
 	ctx, span := tracer.Start(ctx, "dynamicNamespaceLister.Get", trace.WithAttributes(
+		attribute.String("location", fmt.Sprintf("%s:%d", file, line)),
 		attribute.String("name", name),
 	))
 	defer span.End()
@@ -89,8 +97,11 @@ type dynamicNamespaceLister struct {
 
 // List lists all resources in the indexer for a given namespace.
 func (l *dynamicNamespaceLister) List(ctx context.Context, selector labels.Selector) (ret []*unstructured.Unstructured, err error) {
-	tracer := otel.GetTracerProvider().Tracer("library-go")
+	tracer := otel.GetTracerProvider().Tracer("client-go")
+	pc, _, _, _ := runtime.Caller(1)
+	file, line := runtime.FuncForPC(pc).FileLine(pc)
 	ctx, span := tracer.Start(ctx, "dynamicNamespaceLister.List", trace.WithAttributes(
+		attribute.String("location", fmt.Sprintf("%s:%d", file, line)),
 		attribute.String("selector", selector.String()),
 	))
 	defer span.End()

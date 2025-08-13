@@ -19,6 +19,7 @@ package listers
 import (
 	"context"
 	"fmt"
+	goruntime "runtime"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
@@ -26,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
 
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -61,10 +63,13 @@ func (l ResourceIndexer[T]) List(ctx context.Context, selector labels.Selector) 
 
 // Get retrieves the resource from the index for a given name.
 func (l ResourceIndexer[T]) Get(ctx context.Context, name string) (T, error) {
-	tracer := trace.SpanFromContext(ctx).TracerProvider().Tracer("client-go")
+	tracer := otel.GetTracerProvider().Tracer("client-go")
+	pc, _, _, _ := goruntime.Caller(1)
+	file, line := goruntime.FuncForPC(pc).FileLine(pc)
 	ctx, span := tracer.Start(ctx, fmt.Sprintf("lister.%s/%s.Get", l.resource.Group, l.resource.Resource), trace.WithAttributes(
 		attribute.String("namespace", l.namespace),
 		attribute.String("name", name),
+		attribute.String("location", fmt.Sprintf("%s:%d", file, line)),
 	))
 	defer span.End()
 	var key string
