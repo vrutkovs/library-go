@@ -272,8 +272,8 @@ github.com/vrutkovs/apiextensions-apiserver v0.0.0-20250812082223-6b92852167cf h
 github.com/vrutkovs/apiextensions-apiserver v0.0.0-20250812082223-6b92852167cf/go.mod h1:nTBpM20NruCpIQ00yOWlRHmMlrlI9UH7bpqSatXu4k0=
 github.com/vrutkovs/apiserver v0.0.0-20250812081447-8cb82bbdd044 h1:KIdqVH5BNfZjcPO47mY0Cv6gSuuiKQtZSwKKdzUYlQo=
 github.com/vrutkovs/apiserver v0.0.0-20250812081447-8cb82bbdd044/go.mod h1:o/sITIhz04a8EVLGQigCDtCGAO1GkMwGYLJuEY+UUkU=
-github.com/vrutkovs/client-go v0.0.0-20250813113115-b01a4952cc21 h1:syPe3hm2R5ochutqKl3K5h0Q2cX06RzHOOCZqNjh3kg=
-github.com/vrutkovs/client-go v0.0.0-20250813113115-b01a4952cc21/go.mod h1:DG7x7QdXiFcdomhcMKUHLTqViZMBsVuYplNwZUVIBF0=
+github.com/vrutkovs/client-go v0.0.0-20250813152011-1f7180373f82 h1:KoFEz9aztZtnIQp9tX6NtLWqmsRMsTItCpzhIzSkDOg=
+github.com/vrutkovs/client-go v0.0.0-20250813152011-1f7180373f82/go.mod h1:DG7x7QdXiFcdomhcMKUHLTqViZMBsVuYplNwZUVIBF0=
 github.com/vrutkovs/klog/v2 v2.0.0-20250813113851-0481beef9e99 h1:DOlfHpFD+qKT2bW5iDFuaob32qKll+sF1Ilrm3S0E5w=
 github.com/vrutkovs/klog/v2 v2.0.0-20250813113851-0481beef9e99/go.mod h1:0kkXxJ4w2yULlxeaf+U7pOCUCTlW+0iI+bvDZQ4zPI4=
 github.com/vrutkovs/kube-aggregator v0.0.0-20250812082856-a3f54eada162 h1:i1E75PuGZ+xRmcNYG21Ch3Bmr2SaMijNz0XmixDxTJM=

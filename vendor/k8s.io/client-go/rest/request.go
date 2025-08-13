@@ -40,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -1313,13 +1314,34 @@ func (r *Request) Do(ctx context.Context) Result {
 }
 
 func (r *Request) Trace(ctx context.Context, span trace.Span, msg string) *Request {
-	span.AddEvent(msg)
+	opts := []trace.EventOption{
+		trace.WithAttributes(attribute.String("host", r.URL().Host)),
+		trace.WithAttributes(attribute.String("path", r.URL().Path)),
+		trace.WithAttributes(attribute.String("verb", r.verb)),
+	}
 	for k, values := range r.headers {
-		key := fmt.Sprintf("request-%s", k)
+		key := fmt.Sprintf("header-%s", k)
 		for _, v := range values {
-			span.SetAttributes(attribute.String(key, v))
+			opts = append(opts, trace.WithAttributes(attribute.String(key, v)))
 		}
 	}
+	if r.body != nil {
+		encoder, err := r.contentConfig.Negotiator.Decoder(r.contentConfig.ContentType, nil)
+		if err == nil {
+			var obj unstructured.Unstructured
+			_, _, err := encoder.Decode(r.bodyBytes, nil, &obj)
+			if err == nil {
+				opts = append(opts, trace.WithAttributes(attribute.String("body", fmt.Sprintf("%#v", obj))))
+			} else {
+				span.RecordError(err, trace.WithAttributes(attribute.String("body", fmt.Sprintf("decode-error: %v", err))))
+			}
+		} else {
+			span.RecordError(err, trace.WithAttributes(attribute.String("body", fmt.Sprintf("encoder-error: %v", err))))
+		}
+	} else {
+		opts = append(opts, trace.WithAttributes(attribute.String("body", "nil")))
+	}
+	span.AddEvent(msg, opts...)
 	return r
 }
 
@@ -1626,13 +1648,31 @@ func (r Result) ContentType(contentType *string) Result {
 }
 
 func (r Result) Trace(ctx context.Context, span trace.Span, msg string) Result {
-	span.AddEvent(msg)
+	opts := []trace.EventOption{
+		trace.WithAttributes(attribute.Int("status-code", r.statusCode)),
+		trace.WithAttributes(attribute.String("content-type", r.contentType)),
+	}
 	for k, values := range r.headers {
-		key := fmt.Sprintf("response-%s", k)
+		key := fmt.Sprintf("header-%s", k)
 		for _, v := range values {
-			span.SetAttributes(attribute.String(key, v))
+			opts = append(opts, trace.WithAttributes(attribute.String(key, v)))
 		}
 	}
+
+	if r.decoder != nil && len(r.body) == 0 {
+		var obj unstructured.Unstructured
+		_, _, err := r.decoder.Decode(r.body, nil, &obj)
+		if err == nil {
+			opts = append(opts, trace.WithAttributes(attribute.String("body", fmt.Sprintf("%#v", obj))))
+		} else {
+			opts = append(opts, trace.WithAttributes(attribute.String("body", fmt.Sprintf("decode-error %v", err))))
+		}
+	} else if len(r.body) == 0 {
+		opts = append(opts, trace.WithAttributes(attribute.String("body", "nil")))
+	} else {
+		opts = append(opts, trace.WithAttributes(attribute.String("body", string(r.body))))
+	}
+	span.AddEvent(msg, opts...)
 	return r
 }
 
