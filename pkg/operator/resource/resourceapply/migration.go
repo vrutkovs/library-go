@@ -37,7 +37,7 @@ func ApplyStorageVersionMigration(ctx context.Context, client migrationclientv1a
 	}
 
 	if klog.V(2).Enabled() {
-		klog.Infof("StorageVersionMigration %q changes: %v", required.Name, JSONPatchNoError(existing, required))
+		klog.InfofWithCtx(ctx, "StorageVersionMigration %q changes: %v", required.Name, JSONPatchNoError(existing, required))
 	}
 
 	required.Spec.Resource.DeepCopyInto(&existingCopy.Spec.Resource)

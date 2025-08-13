@@ -55,7 +55,7 @@ func innerTLSSecurityProfileObservations(ctx context.Context, genericListers con
 
 	apiServer, err := listers.APIServerLister().Get(ctx, "cluster")
 	if errors.IsNotFound(err) {
-		klog.Warningf("apiserver.config.openshift.io/cluster: not found")
+		klog.WarningfWithCtx(ctx, "apiserver.config.openshift.io/cluster: not found")
 		apiServer = &configv1.APIServer{}
 	} else if err != nil {
 		return existingConfig, append(errs, err)

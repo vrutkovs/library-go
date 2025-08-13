@@ -96,7 +96,7 @@ func assertAPIConnection(ctx context.Context, kubeClient *kubernetes.Clientset, 
 	err := wait.PollImmediateUntil(1*time.Second, func() (done bool, err error) {
 		_, lastErr = kubeClient.CoordinationV1().Leases(le.Namespace).Get(ctx, le.Name, metav1.GetOptions{})
 		if lastErr != nil && !apierrors.IsNotFound(lastErr) {
-			klog.V(4).Infof("Error checking for connectivity to apiserver (GET lease %s/%s): %v", le.Namespace, le.Name, lastErr)
+			klog.V(4).InfofWithCtx(ctx, "Error checking for connectivity to apiserver (GET lease %s/%s): %v", le.Namespace, le.Name, lastErr)
 			return false, nil
 		}
 		return true, nil

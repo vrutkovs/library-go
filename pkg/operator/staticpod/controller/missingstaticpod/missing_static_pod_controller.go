@@ -231,7 +231,7 @@ func (c *missingStaticPodController) getStaticPodTerminationGracePeriodSecondsFo
 	}
 
 	if serializedStaticPod.Spec.TerminationGracePeriodSeconds == nil {
-		klog.V(6).Infof("optional field: %s.spec.terminationGracePeriodSeconds was not specified in cm: %s, returning default value of 30s", staticPodKeyName, staticPodConfigMapName)
+		klog.V(6).InfofWithCtx(ctx, "optional field: %s.spec.terminationGracePeriodSeconds was not specified in cm: %s, returning default value of 30s", staticPodKeyName, staticPodConfigMapName)
 		return 30 * time.Second, nil
 	}
 

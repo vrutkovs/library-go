@@ -127,7 +127,7 @@ func ApplyNamespaceImproved(ctx context.Context, client coreclientv1.NamespacesG
 	}
 
 	if klog.V(2).Enabled() {
-		klog.Infof("Namespace %q changes: %v", required.Name, JSONPatchNoError(existing, existingCopy))
+		klog.InfofWithCtx(ctx, "Namespace %q changes: %v", required.Name, JSONPatchNoError(existing, existingCopy))
 	}
 
 	actual, err := client.Namespaces().Update(ctx, existingCopy, metav1.UpdateOptions{})
@@ -194,7 +194,7 @@ func ApplyServiceImproved(ctx context.Context, client coreclientv1.ServicesGette
 	// any user *and* Kubernetes changes, hoping that Kubernetes will restore its values.
 	existingCopy.Spec = required.Spec
 	if klog.V(4).Enabled() {
-		klog.Infof("Service %q changes: %v", required.Namespace+"/"+required.Name, JSONPatchNoError(existing, required))
+		klog.InfofWithCtx(ctx, "Service %q changes: %v", required.Namespace+"/"+required.Name, JSONPatchNoError(existing, required))
 	}
 
 	actual, err := client.Services(required.Namespace).Update(ctx, existingCopy, metav1.UpdateOptions{})
@@ -238,7 +238,7 @@ func ApplyPodImproved(ctx context.Context, client coreclientv1.PodsGetter, recor
 	}
 
 	if klog.V(2).Enabled() {
-		klog.Infof("Pod %q changes: %v", required.Namespace+"/"+required.Name, JSONPatchNoError(existing, required))
+		klog.InfofWithCtx(ctx, "Pod %q changes: %v", required.Namespace+"/"+required.Name, JSONPatchNoError(existing, required))
 	}
 
 	actual, err := client.Pods(required.Namespace).Update(ctx, existingCopy, metav1.UpdateOptions{})
@@ -281,7 +281,7 @@ func ApplyServiceAccountImproved(ctx context.Context, client coreclientv1.Servic
 		return existingCopy, false, nil
 	}
 	if klog.V(2).Enabled() {
-		klog.Infof("ServiceAccount %q changes: %v", required.Namespace+"/"+required.Name, JSONPatchNoError(existing, required))
+		klog.InfofWithCtx(ctx, "ServiceAccount %q changes: %v", required.Namespace+"/"+required.Name, JSONPatchNoError(existing, required))
 	}
 	actual, err := client.ServiceAccounts(required.Namespace).Update(ctx, existingCopy, metav1.UpdateOptions{})
 	resourcehelper.ReportUpdateEvent(recorder, required, err)
@@ -382,7 +382,7 @@ func ApplyConfigMapImproved(ctx context.Context, client coreclientv1.ConfigMapsG
 		details = fmt.Sprintf("cause by changes in %v", strings.Join(modifiedKeys, ","))
 	}
 	if klog.V(2).Enabled() {
-		klog.Infof("ConfigMap %q changes: %v", required.Namespace+"/"+required.Name, JSONPatchNoError(existing, required))
+		klog.InfofWithCtx(ctx, "ConfigMap %q changes: %v", required.Namespace+"/"+required.Name, JSONPatchNoError(existing, required))
 	}
 	resourcehelper.ReportUpdateEvent(recorder, required, err, details)
 	cache.UpdateCachedResourceMetadata(required, actual)
@@ -467,7 +467,7 @@ func ApplySecretImproved(ctx context.Context, client coreclientv1.SecretsGetter,
 	}
 
 	if klog.V(4).Enabled() {
-		klog.Infof("Secret %s/%s changes: %v", required.Namespace, required.Name, JSONPatchSecretNoError(existing, existingCopy))
+		klog.InfofWithCtx(ctx, "Secret %s/%s changes: %v", required.Namespace, required.Name, JSONPatchSecretNoError(existing, existingCopy))
 	}
 
 	var actual *corev1.Secret

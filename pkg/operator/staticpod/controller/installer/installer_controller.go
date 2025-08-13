@@ -531,7 +531,7 @@ func (c *InstallerController) manageInstallationPods(ctx context.Context, operat
 					}
 					earliestRetry := currNodeState.LastFailedTime.Add(delay)
 					if !c.now().After(earliestRetry) {
-						klog.V(4).Infof("Backing off node %s installer retry %d until %v", currNodeState.NodeName, currNodeState.LastFailedCount+1, earliestRetry)
+						klog.V(4).InfofWithCtx(ctx, "Backing off node %s installer retry %d until %v", currNodeState.NodeName, currNodeState.LastFailedCount+1, earliestRetry)
 						return true, earliestRetry.Sub(c.now()), nil, nil, nil
 					}
 				}
@@ -551,16 +551,16 @@ func (c *InstallerController) manageInstallationPods(ctx context.Context, operat
 				return true, 0, nil, nil, err
 			}
 			if newCurrNodeState.LastFailedReason == nodeStatusInstalledFailedReason && newCurrNodeState.LastFailedCount != currNodeState.LastFailedCount {
-				klog.Infof("Will retry %q for revision %d for the %s time because %s", currNodeState.NodeName, currNodeState.TargetRevision, nthTimeOr1st(newCurrNodeState.LastFailedCount), reason)
+				klog.InfofWithCtx(ctx, "Will retry %q for revision %d for the %s time because %s", currNodeState.NodeName, currNodeState.TargetRevision, nthTimeOr1st(newCurrNodeState.LastFailedCount), reason)
 			}
 			if newCurrNodeState.LastFailedReason == nodeStatusOperandFailedFallbackReason && newCurrNodeState.LastFallbackCount != currNodeState.LastFallbackCount {
-				klog.Infof("Will fallback %q for revision %d to last-known-good revision for the %s time because %s", currNodeState.NodeName, currNodeState.TargetRevision, nthTimeOr1st(newCurrNodeState.LastFallbackCount), reason)
+				klog.InfofWithCtx(ctx, "Will fallback %q for revision %d to last-known-good revision for the %s time because %s", currNodeState.NodeName, currNodeState.TargetRevision, nthTimeOr1st(newCurrNodeState.LastFallbackCount), reason)
 			}
 
 			// if we make a change to this status, we want to write it out to the API before we commence work on the next node.
 			// it's an extra write/read, but it makes the state debuggable from outside this process
 			if !equality.Semantic.DeepEqual(newCurrNodeState, currNodeState) {
-				klog.Infof("%q moving to %v because %s", currNodeState.NodeName, spew.Sdump(*newCurrNodeState), reason)
+				klog.InfofWithCtx(ctx, "%q moving to %v because %s", currNodeState.NodeName, spew.Sdump(*newCurrNodeState), reason)
 				nodeCurrentRevisionChangedFn := func() {
 					if currNodeState.CurrentRevision != newCurrNodeState.CurrentRevision {
 						c.eventRecorder.Eventf("NodeCurrentRevisionChanged", "Updated node %q from revision %d to %d because %s", currNodeState.NodeName,
@@ -570,7 +570,7 @@ func (c *InstallerController) manageInstallationPods(ctx context.Context, operat
 				return false, 0, newCurrNodeState, nodeCurrentRevisionChangedFn, nil
 			}
 
-			klog.V(2).Infof("%q is in transition to %d, but has not made progress because %s", currNodeState.NodeName, currNodeState.TargetRevision, reasonWithBlame(reason))
+			klog.V(2).InfofWithCtx(ctx, "%q is in transition to %d, but has not made progress because %s", currNodeState.NodeName, currNodeState.TargetRevision, reasonWithBlame(reason))
 			return false, 0, nil, nil, nil
 		}
 
@@ -578,11 +578,11 @@ func (c *InstallerController) manageInstallationPods(ctx context.Context, operat
 
 		revisionToStart := c.getRevisionToStart(currNodeState, prevNodeState, operatorStatus)
 		if revisionToStart == 0 {
-			klog.V(4).Infof("%s, but node %s does not need update", nodeChoiceReason, currNodeState.NodeName)
+			klog.V(4).InfofWithCtx(ctx, "%s, but node %s does not need update", nodeChoiceReason, currNodeState.NodeName)
 			continue
 		}
 
-		klog.Infof("%s and needs new revision %d", nodeChoiceReason, revisionToStart)
+		klog.InfofWithCtx(ctx, "%s and needs new revision %d", nodeChoiceReason, revisionToStart)
 
 		newCurrNodeState := currNodeState.DeepCopy()
 		newCurrNodeState.TargetRevision = revisionToStart
@@ -590,7 +590,7 @@ func (c *InstallerController) manageInstallationPods(ctx context.Context, operat
 		// if we make a change to this status, we want to write it out to the API before we commence work on the next node.
 		// it's an extra write/read, but it makes the state debuggable from outside this process
 		if !equality.Semantic.DeepEqual(newCurrNodeState, currNodeState) {
-			klog.Infof("%q moving to %v", currNodeState.NodeName, spew.Sdump(*newCurrNodeState))
+			klog.InfofWithCtx(ctx, "%q moving to %v", currNodeState.NodeName, spew.Sdump(*newCurrNodeState))
 
 			nodeTargetRevisionChangedFn := func() {
 				if currNodeState.TargetRevision != newCurrNodeState.TargetRevision && newCurrNodeState.TargetRevision != 0 {
@@ -1215,7 +1215,7 @@ func (c *InstallerController) Sync(ctx context.Context, syncCtx factory.SyncCont
 		}
 
 		if operatorRV < c.lastPodOperatorAppliedRV {
-			klog.V(4).Info("Skipping installer controller sync, StaticPodOperator lister hasn't observed the effect of its most recent write")
+			klog.V(4).InfofWithCtx(ctx, "Skipping installer controller sync, StaticPodOperator lister hasn't observed the effect of its most recent write")
 			return nil
 		}
 

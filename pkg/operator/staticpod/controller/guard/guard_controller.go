@@ -203,7 +203,7 @@ var pdbTemplate []byte
 var podTemplate []byte
 
 func (c *GuardController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	klog.V(5).Info("Syncing guards")
+	klog.V(5).InfofWithCtx(ctx, "Syncing guards")
 
 	tracer := otel.GetTracerProvider().Tracer("library-go")
 	ctx, span := tracer.Start(ctx, "ckao.GuardController", trace.WithAttributes(
@@ -221,7 +221,7 @@ func (c *GuardController) sync(ctx context.Context, syncCtx factory.SyncContext)
 	}
 
 	if !precheckSucceeded {
-		klog.V(4).Infof("create conditional precheck did not succeed, skipping")
+		klog.V(4).InfofWithCtx(ctx, "create conditional precheck did not succeed, skipping")
 		return nil
 	}
 
@@ -235,7 +235,8 @@ func (c *GuardController) sync(ctx context.Context, syncCtx factory.SyncContext)
 		// so no Delete request is executed.
 		pdbs, err := c.pdbLister.PodDisruptionBudgets(c.targetNamespace).List(ctx, labels.Everything())
 		if err != nil {
-			klog.Errorf("Unable to list PodDisruptionBudgets: %v", err)
+			klog.ErrorfWithCtx(ctx, "Unable to list PodDisruptionBudgets: %v", err)
+			klog.RecordError(ctx, err)
 			return err
 		}
 
@@ -243,7 +244,8 @@ func (c *GuardController) sync(ctx context.Context, syncCtx factory.SyncContext)
 			if pdbItem.Name == pdb.Name {
 				_, _, err := resourceapply.DeletePodDisruptionBudget(ctx, c.pdbGetter, syncCtx.Recorder(), pdb)
 				if err != nil {
-					klog.Errorf("Unable to delete PodDisruptionBudget: %v", err)
+					klog.ErrorfWithCtx(ctx, "Unable to delete PodDisruptionBudget: %v", err)
+					klog.RecordError(ctx, err)
 					errs = append(errs, err)
 				}
 				break
@@ -257,7 +259,8 @@ func (c *GuardController) sync(ctx context.Context, syncCtx factory.SyncContext)
 			for _, pod := range pods {
 				_, _, err = resourceapply.DeletePod(ctx, c.podGetter, syncCtx.Recorder(), pod)
 				if err != nil {
-					klog.Errorf("Unable to delete Pod: %v", err)
+					klog.ErrorfWithCtx(ctx, "Unable to delete Pod: %v", err)
+					klog.RecordError(ctx, err)
 					errs = append(errs, err)
 				}
 			}
@@ -284,7 +287,7 @@ func (c *GuardController) sync(ctx context.Context, syncCtx factory.SyncContext)
 			return err
 		}
 
-		klog.V(5).Infof("Rendering guard pdb")
+		klog.V(5).InfofWithCtx(ctx, "Rendering guard pdb")
 
 		pdb := resourceread.ReadPodDisruptionBudgetV1OrDie(pdbTemplate)
 		pdb.ObjectMeta.Name = getGuardPDBName(c.podResourcePrefix)
@@ -301,18 +304,21 @@ func (c *GuardController) sync(ctx context.Context, syncCtx factory.SyncContext)
 				!ptr.Equal(pdbObj.Spec.MinAvailable, pdb.Spec.MinAvailable) {
 				_, _, err = resourceapply.ApplyPodDisruptionBudget(ctx, c.pdbGetter, syncCtx.Recorder(), pdb)
 				if err != nil {
-					klog.Errorf("Unable to apply PodDisruptionBudget changes: %v", err)
+					klog.ErrorfWithCtx(ctx, "Unable to apply PodDisruptionBudget changes: %v", err)
+					klog.RecordError(ctx, err)
 					return fmt.Errorf("Unable to apply PodDisruptionBudget changes: %v", err)
 				}
 			}
 		} else if errors.IsNotFound(err) {
 			_, _, err = resourceapply.ApplyPodDisruptionBudget(ctx, c.pdbGetter, syncCtx.Recorder(), pdb)
 			if err != nil {
-				klog.Errorf("Unable to create PodDisruptionBudget: %v", err)
+				klog.ErrorfWithCtx(ctx, "Unable to create PodDisruptionBudget: %v", err)
+				klog.RecordError(ctx, err)
 				return fmt.Errorf("Unable to create PodDisruptionBudget: %v", err)
 			}
 		} else {
-			klog.Errorf("Unable to get PodDisruptionBudget: %v", err)
+			klog.ErrorfWithCtx(ctx, "Unable to get PodDisruptionBudget: %v", err)
+			klog.RecordError(ctx, err)
 			return err
 		}
 
@@ -324,7 +330,8 @@ func (c *GuardController) sync(ctx context.Context, syncCtx factory.SyncContext)
 		for _, node := range nodes {
 			// Check whether the node is schedulable
 			if nodeHasUnschedulableTaint(node) {
-				klog.Infof("Node %v not schedulable, skipping reconciling the guard pod", node.Name)
+				klog.InfofWithCtx(ctx, "Node %v not schedulable, skipping reconciling the guard pod", node.Name)
+				klog.RecordError(ctx, err)
 				continue
 			}
 
@@ -333,22 +340,25 @@ func (c *GuardController) sync(ctx context.Context, syncCtx factory.SyncContext)
 				nodeReadyCondition := nodeConditionFinder(&node.Status, corev1.NodeReady)
 				// If a "Ready" condition is not found, that node should be deemed as not Ready by default.
 				if nodeReadyCondition == nil || nodeReadyCondition.Status != corev1.ConditionTrue {
-					klog.Infof("Node %v not ready, skipping reconciling the guard pod", node.Name)
+					klog.InfofWithCtx(ctx, "Node %v not ready, skipping reconciling the guard pod", node.Name)
+					klog.RecordError(ctx, err)
 					continue
 				}
 
-				klog.Errorf("Missing operand on node %v", node.Name)
+				klog.ErrorfWithCtx(ctx, "Missing operand on node %v", node.Name)
+				klog.RecordError(ctx, err)
 				errs = append(errs, fmt.Errorf("Missing operand on node %v", node.Name))
 				continue
 			}
 
 			if operands[node.Name].Status.PodIP == "" {
-				klog.Errorf("Missing PodIP in operand %v on node %v", operands[node.Name].Name, node.Name)
+				klog.ErrorfWithCtx(ctx, "Missing PodIP in operand %v on node %v", operands[node.Name].Name, node.Name)
+				klog.RecordError(ctx, err)
 				errs = append(errs, fmt.Errorf("Missing PodIP in operand %v on node %v", operands[node.Name].Name, node.Name))
 				continue
 			}
 
-			klog.V(5).Infof("Rendering guard pod for operand %v on node %v", operands[node.Name].Name, node.Name)
+			klog.V(5).InfofWithCtx(ctx, "Rendering guard pod for operand %v on node %v", operands[node.Name].Name, node.Name)
 
 			pod := resourceread.ReadPodV1OrDie(podTemplate)
 
@@ -371,33 +381,34 @@ func (c *GuardController) sync(ctx context.Context, syncCtx factory.SyncContext)
 				// Delete the pod so it can be re-created. ApplyPod only updates the metadata part of the manifests, ignores the rest
 				delete := false
 				if actual.Spec.Containers[0].Image != pod.Spec.Containers[0].Image {
-					klog.V(5).Infof("Guard Image changed, deleting %v so the guard can be re-created", pod.Name)
+					klog.V(5).InfofWithCtx(ctx, "Guard Image changed, deleting %v so the guard can be re-created", pod.Name)
 					delete = true
 				}
 				if actual.Spec.Containers[0].ReadinessProbe.HTTPGet.Host != pod.Spec.Containers[0].ReadinessProbe.HTTPGet.Host {
-					klog.V(5).Infof("Operand PodIP changed, deleting %v so the guard can be re-created", pod.Name)
+					klog.V(5).InfofWithCtx(ctx, "Operand PodIP changed, deleting %v so the guard can be re-created", pod.Name)
 					delete = true
 				}
 				if actual.Spec.Containers[0].ReadinessProbe.HTTPGet.Port.String() != pod.Spec.Containers[0].ReadinessProbe.HTTPGet.Port.String() {
-					klog.V(5).Infof("Guard readinessProbe port changed, deleting %v so the guard can be re-created", pod.Name)
+					klog.V(5).InfofWithCtx(ctx, "Guard readinessProbe port changed, deleting %v so the guard can be re-created", pod.Name)
 					delete = true
 				}
 				if actual.Spec.Containers[0].ReadinessProbe.HTTPGet.Path != pod.Spec.Containers[0].ReadinessProbe.HTTPGet.Path {
-					klog.V(5).Infof("Guard readinessProbe path changed, deleting %v so the guard can be re-created", pod.Name)
+					klog.V(5).InfofWithCtx(ctx, "Guard readinessProbe path changed, deleting %v so the guard can be re-created", pod.Name)
 					delete = true
 				}
 				if actual.Spec.Hostname != pod.Spec.Hostname {
-					klog.V(5).Infof("Guard Hostname changed, deleting %v so the guard can be re-created", pod.Name)
+					klog.V(5).InfofWithCtx(ctx, "Guard Hostname changed, deleting %v so the guard can be re-created", pod.Name)
 					delete = true
 				}
 				if actual.Status.Phase != "" && actual.Status.Phase != corev1.PodPending && actual.Status.Phase != corev1.PodRunning {
-					klog.V(5).Infof("Pod phase is neither pending nor running, deleting %v so the guard can be re-created", pod.Name)
+					klog.V(5).InfofWithCtx(ctx, "Pod phase is neither pending nor running, deleting %v so the guard can be re-created", pod.Name)
 					delete = true
 				}
 				if delete {
 					_, _, err = resourceapply.DeletePod(ctx, c.podGetter, syncCtx.Recorder(), pod)
 					if err != nil {
-						klog.Errorf("Unable to delete Pod for immidiate re-creation: %v", err)
+						klog.ErrorfWithCtx(ctx, "Unable to delete Pod for immidiate re-creation: %v", err)
+						klog.RecordError(ctx, err)
 						errs = append(errs, fmt.Errorf("Unable to delete Pod for immidiate re-creation: %v", err))
 						continue
 					}
@@ -411,7 +422,8 @@ func (c *GuardController) sync(ctx context.Context, syncCtx factory.SyncContext)
 				span.AddEvent(fmt.Sprintf("Diff: %s", diff))
 				_, _, err = resourceapply.ApplyPod(ctx, c.podGetter, syncCtx.Recorder(), pod)
 				if err != nil {
-					klog.Errorf("Unable to apply pod %v changes: %v", pod.Name, err)
+					klog.ErrorfWithCtx(ctx, "Unable to apply pod %v changes: %v", pod.Name, err)
+					klog.RecordError(ctx, err)
 					errs = append(errs, fmt.Errorf("Unable to apply pod %v changes: %v", pod.Name, err))
 				}
 			}

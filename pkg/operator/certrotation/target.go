@@ -146,7 +146,7 @@ func (c RotatedSelfSignedCertKeySecret) EnsureTargetCertKeyPair(ctx context.Cont
 		if err != nil {
 			return nil, err
 		}
-		klog.V(2).Infof("Created secret %s/%s", actualTargetCertKeyPairSecret.Namespace, actualTargetCertKeyPairSecret.Name)
+		klog.V(2).InfofWithCtx(ctx, "Created secret %s/%s", actualTargetCertKeyPairSecret.Namespace, actualTargetCertKeyPairSecret.Name)
 		targetCertKeyPairSecret = actualTargetCertKeyPairSecret
 	} else if updateRequired {
 		actualTargetCertKeyPairSecret, err := c.Client.Secrets(c.Namespace).Update(ctx, targetCertKeyPairSecret, metav1.UpdateOptions{})
@@ -158,7 +158,7 @@ func (c RotatedSelfSignedCertKeySecret) EnsureTargetCertKeyPair(ctx context.Cont
 		if err != nil {
 			return nil, err
 		}
-		klog.V(2).Infof("Updated secret %s/%s", actualTargetCertKeyPairSecret.Namespace, actualTargetCertKeyPairSecret.Name)
+		klog.V(2).InfofWithCtx(ctx, "Updated secret %s/%s", actualTargetCertKeyPairSecret.Namespace, actualTargetCertKeyPairSecret.Name)
 		targetCertKeyPairSecret = actualTargetCertKeyPairSecret
 	}
 

@@ -106,7 +106,7 @@ func (c RevisionController) createRevisionIfNeeded(ctx context.Context, recorder
 
 	// check to make sure that the latestRevision has the exact content we expect.  No mutation here, so we start creating the next Revision only when it is required
 	if isLatestRevisionCurrent {
-		klog.V(4).Infof("Returning early, %d triggered and up to date", currentLastAvailableRevision)
+		klog.V(4).InfofWithCtx(ctx, "Returning early, %d triggered and up to date", currentLastAvailableRevision)
 		return nil
 	}
 
@@ -126,7 +126,7 @@ func (c RevisionController) createRevisionIfNeeded(ctx context.Context, recorder
 	}
 
 	if !createdNewRevision {
-		klog.V(4).Infof("Revision %v not created", nextRevision)
+		klog.V(4).InfofWithCtx(ctx, "Revision %v not created", nextRevision)
 		return nil
 	}
 
@@ -169,7 +169,7 @@ func (c RevisionController) isLatestRevisionCurrent(ctx context.Context, revisio
 		}
 		if !equality.Semantic.DeepEqual(existingData, requiredData) {
 			if klog.V(4).Enabled() {
-				klog.Infof("configmap %q changes for revision %d: %s", cm.Name, revision, resourceapply.JSONPatchNoError(existing, required))
+				klog.InfofWithCtx(ctx, "configmap %q changes for revision %d: %s", cm.Name, revision, resourceapply.JSONPatchNoError(existing, required))
 			}
 			// "configmap/foo has changed" when there is actual change in data
 			// "configmap/foo has been created" when the existing configmap was empty (iow. the configmap is optional)
@@ -206,7 +206,7 @@ func (c RevisionController) isLatestRevisionCurrent(ctx context.Context, revisio
 		}
 		if !equality.Semantic.DeepEqual(existingData, requiredData) {
 			if klog.V(4).Enabled() {
-				klog.Infof("Secret %q changes for revision %d: %s", s.Name, revision, resourceapply.JSONPatchSecretNoError(existing, required))
+				klog.InfofWithCtx(ctx, "Secret %q changes for revision %d: %s", s.Name, revision, resourceapply.JSONPatchSecretNoError(existing, required))
 			}
 			// "configmap/foo has changed" when there is actual change in data
 			// "configmap/foo has been created" when the existing configmap was empty (iow. the configmap is optional)
@@ -258,7 +258,7 @@ func (c RevisionController) createNewRevision(ctx context.Context, recorder even
 		}
 		if createdStatus.Annotations["operator.openshift.io/revision-ready"] == "true" {
 			// no work to do because our cache is out of date and when we're updated, we will be able to see the result
-			klog.Infof("down the branch indicating that our cache was out of date and we're trying to recreate a revision.")
+			klog.InfofWithCtx(ctx, "down the branch indicating that our cache was out of date and we're trying to recreate a revision.")
 			return false, nil
 		}
 		// update the sync and continue

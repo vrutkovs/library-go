@@ -3,11 +3,12 @@ package controllercmd
 import (
 	"context"
 	"fmt"
-	"k8s.io/utils/clock"
 	"os"
 	"strings"
 	"sync"
 	"time"
+
+	"k8s.io/utils/clock"
 
 	configv1 "github.com/openshift/api/config/v1"
 	operatorv1alpha1 "github.com/openshift/api/operator/v1alpha1"
@@ -262,14 +263,16 @@ func (b *ControllerBuilder) Run(ctx context.Context, config *unstructured.Unstru
 	kubeClient := kubernetes.NewForConfigOrDie(clientConfig)
 	namespace, err := b.getComponentNamespace()
 	if err != nil {
-		klog.Warningf("unable to identify the current namespace for events: %v", err)
+		klog.WarningfWithCtx(ctx, "unable to identify the current namespace for events: %v", err)
+		klog.RecordError(ctx, err)
 	}
 	controllerRef := b.componentOwnerReference
 
 	if controllerRef == nil {
 		controllerRef, err = events.GetControllerReferenceForCurrentPod(ctx, kubeClient, namespace, nil)
 		if err != nil {
-			klog.Warningf("unable to get owner reference (falling back to namespace): %v", err)
+			klog.WarningfWithCtx(ctx, "unable to get owner reference (falling back to namespace): %v", err)
+			klog.RecordError(ctx, err)
 		}
 	}
 	eventRecorder := events.NewKubeRecorderWithOptions(kubeClient.CoreV1().Events(namespace), b.eventRecorderOptions, b.componentName, controllerRef, b.clock)
@@ -330,9 +333,10 @@ func (b *ControllerBuilder) Run(ctx context.Context, config *unstructured.Unstru
 
 		go func() {
 			if err := server.PrepareRun().Run(ctx.Done()); err != nil {
-				klog.Fatal(err)
+				klog.FatalfWithCtx(ctx, "Error starting server %v", err)
+				klog.RecordError(ctx, err)
 			}
-			klog.Info("server exited")
+			klog.InfofWithCtx(ctx, "server exited")
 		}()
 	}
 
@@ -361,7 +365,8 @@ func (b *ControllerBuilder) Run(ctx context.Context, config *unstructured.Unstru
 		topology, err := b.topologyDetector.DetectTopology(ctx, clientConfig)
 		if err != nil || topology == "" {
 			eventRecorder.Warningf("ControlPlaneTopology", "unable to get control plane topology, using HA cluster values for leader election: %v", err)
-			klog.Warningf("unable to get control plane topology, using HA cluster values for leader election: %v", err)
+			klog.WarningfWithCtx(ctx, "unable to get control plane topology, using HA cluster values for leader election: %v", err)
+			klog.RecordError(ctx, err)
 		} else {
 			snoLeaderElection := topologyLeaderElection(topology, *b.leaderElection)
 			b.leaderElection = &snoLeaderElection

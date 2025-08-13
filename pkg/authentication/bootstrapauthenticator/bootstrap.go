@@ -81,7 +81,7 @@ func (b *bootstrapPassword) AuthenticatePassword(ctx context.Context, username, 
 
 	if err := bcrypt.CompareHashAndPassword(data.PasswordHash, []byte(password)); err != nil {
 		if err == bcrypt.ErrMismatchedHashAndPassword {
-			klog.V(4).Infof("%s password mismatch", bootstrapUserBasicAuth)
+			klog.V(4).InfofWithCtx(ctx, "%s password mismatch", bootstrapUserBasicAuth)
 			return nil, false, nil
 		}
 		return nil, false, err

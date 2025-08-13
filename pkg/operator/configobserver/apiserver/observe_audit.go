@@ -38,7 +38,7 @@ func NewAuditObserver(pathGetter AuditPolicyPathGetterFunc) configobserver.Obser
 		apiServer, err := listers.APIServerLister().Get(ctx, "cluster")
 		if err != nil {
 			if k8serrors.IsNotFound(err) {
-				klog.Warningf("apiserver.config.openshift.io/cluster: not found")
+				klog.WarningfWithCtx(ctx, "apiserver.config.openshift.io/cluster: not found")
 
 				return existingConfig, errs
 			}

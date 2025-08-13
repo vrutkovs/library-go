@@ -79,7 +79,7 @@ func ApplyStorageClass(ctx context.Context, client storageclientv1.StorageClasse
 	}
 
 	if klog.V(2).Enabled() {
-		klog.Infof("StorageClass %q changes: %v", required.Name, JSONPatchNoError(existingCopy, requiredCopy))
+		klog.InfofWithCtx(ctx, "StorageClass %q changes: %v", required.Name, JSONPatchNoError(existingCopy, requiredCopy))
 	}
 
 	if storageClassNeedsRecreate(existingCopy, requiredCopy) {
@@ -182,7 +182,7 @@ func ApplyCSIDriver(ctx context.Context, client storageclientv1.CSIDriversGetter
 	}
 
 	if klog.V(2).Enabled() {
-		klog.Infof("CSIDriver %q changes: %v", required.Name, JSONPatchNoError(existing, existingCopy))
+		klog.InfofWithCtx(ctx, "CSIDriver %q changes: %v", required.Name, JSONPatchNoError(existing, existingCopy))
 	}
 
 	if sameSpec {

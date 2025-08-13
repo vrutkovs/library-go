@@ -81,7 +81,7 @@ func (c *CertSyncController) sync(ctx context.Context, syncCtx factory.SyncConte
 
 	errors := []error{}
 
-	klog.Infof("Syncing configmaps: %v", c.configMaps)
+	klog.InfofWithCtx(ctx, "Syncing configmaps: %v", c.configMaps)
 	for _, cm := range c.configMaps {
 		configMap, err := c.configMapLister.ConfigMaps(c.namespace).Get(ctx, cm.Name)
 		switch {
@@ -100,7 +100,7 @@ func (c *CertSyncController) sync(ctx context.Context, syncCtx factory.SyncConte
 			// Check with the live call it is really missing
 			configMap, err = c.configmapGetter.Get(ctx, cm.Name, metav1.GetOptions{})
 			if err == nil {
-				klog.Infof("Caches are stale. They don't see configmap '%s/%s', yet it is present", configMap.Namespace, configMap.Name)
+				klog.InfofWithCtx(ctx, "Caches are stale. They don't see configmap '%s/%s', yet it is present", configMap.Namespace, configMap.Name)
 				// We will get re-queued when we observe the change
 				continue
 			}
@@ -145,7 +145,7 @@ func (c *CertSyncController) sync(ctx context.Context, syncCtx factory.SyncConte
 			continue
 		}
 
-		klog.V(2).Infof("Syncing updated configmap '%s/%s'.", configMap.Namespace, configMap.Name)
+		klog.V(2).InfofWithCtx(ctx, "Syncing updated configmap '%s/%s'.", configMap.Namespace, configMap.Name)
 
 		// We need to do a live get here so we don't overwrite a newer file with one from a stale cache
 		configMap, err = c.configmapGetter.Get(ctx, configMap.Name, metav1.GetOptions{})
@@ -158,11 +158,11 @@ func (c *CertSyncController) sync(ctx context.Context, syncCtx factory.SyncConte
 
 		// Check if the live configmap differs
 		if reflect.DeepEqual(configMap.Data, data) {
-			klog.Infof("Caches are stale. The live configmap '%s/%s' is reflected on filesystem, but cached one differs", configMap.Namespace, configMap.Name)
+			klog.InfofWithCtx(ctx, "Caches are stale. The live configmap '%s/%s' is reflected on filesystem, but cached one differs", configMap.Namespace, configMap.Name)
 			continue
 		}
 
-		klog.Infof("Creating directory %q ...", contentDir)
+		klog.InfofWithCtx(ctx, "Creating directory %q ...", contentDir)
 		if err := os.MkdirAll(contentDir, 0755); err != nil && !os.IsExist(err) {
 			c.eventRecorder.Warningf("CertificateUpdateFailed", "Failed creating directory for configmap: %s/%s: %v", configMap.Namespace, configMap.Name, err)
 			errors = append(errors, err)
@@ -175,7 +175,7 @@ func (c *CertSyncController) sync(ctx context.Context, syncCtx factory.SyncConte
 				continue
 			}
 
-			klog.Infof("Writing configmap manifest %q ...", fullFilename)
+			klog.InfofWithCtx(ctx, "Writing configmap manifest %q ...", fullFilename)
 			if err := staticpod.WriteFileAtomic([]byte(content), 0644, fullFilename); err != nil {
 				c.eventRecorder.Warningf("CertificateUpdateFailed", "Failed writing file for configmap: %s/%s: %v", configMap.Namespace, configMap.Name, err)
 				errors = append(errors, err)
@@ -185,7 +185,7 @@ func (c *CertSyncController) sync(ctx context.Context, syncCtx factory.SyncConte
 		c.eventRecorder.Eventf("CertificateUpdated", "Wrote updated configmap: %s/%s", configMap.Namespace, configMap.Name)
 	}
 
-	klog.Infof("Syncing secrets: %v", c.secrets)
+	klog.InfofWithCtx(ctx, "Syncing secrets: %v", c.secrets)
 	for _, s := range c.secrets {
 		secret, err := c.secretLister.Secrets(c.namespace).Get(ctx, s.Name)
 		switch {
@@ -204,7 +204,7 @@ func (c *CertSyncController) sync(ctx context.Context, syncCtx factory.SyncConte
 			// Check with the live call it is really missing
 			secret, err = c.secretGetter.Get(ctx, s.Name, metav1.GetOptions{})
 			if err == nil {
-				klog.Infof("Caches are stale. They don't see secret '%s/%s', yet it is present", secret.Namespace, secret.Name)
+				klog.InfofWithCtx(ctx, "Caches are stale. They don't see secret '%s/%s', yet it is present", secret.Namespace, secret.Name)
 				// We will get re-queued when we observe the change
 				continue
 			}
@@ -250,7 +250,7 @@ func (c *CertSyncController) sync(ctx context.Context, syncCtx factory.SyncConte
 			continue
 		}
 
-		klog.V(2).Infof("Syncing updated secret '%s/%s'.", secret.Namespace, secret.Name)
+		klog.V(2).InfofWithCtx(ctx, "Syncing updated secret '%s/%s'.", secret.Namespace, secret.Name)
 
 		// We need to do a live get here so we don't overwrite a newer file with one from a stale cache
 		secret, err = c.secretGetter.Get(ctx, secret.Name, metav1.GetOptions{})
@@ -263,11 +263,11 @@ func (c *CertSyncController) sync(ctx context.Context, syncCtx factory.SyncConte
 
 		// Check if the live secret differs
 		if reflect.DeepEqual(secret.Data, data) {
-			klog.Infof("Caches are stale. The live secret '%s/%s' is reflected on filesystem, but cached one differs", secret.Namespace, secret.Name)
+			klog.InfofWithCtx(ctx, "Caches are stale. The live secret '%s/%s' is reflected on filesystem, but cached one differs", secret.Namespace, secret.Name)
 			continue
 		}
 
-		klog.Infof("Creating directory %q ...", contentDir)
+		klog.InfofWithCtx(ctx, "Creating directory %q ...", contentDir)
 		if err := os.MkdirAll(contentDir, 0755); err != nil && !os.IsExist(err) {
 			c.eventRecorder.Warningf("CertificateUpdateFailed", "Failed creating directory for secret: %s/%s: %v", secret.Namespace, secret.Name, err)
 			errors = append(errors, err)
@@ -281,7 +281,7 @@ func (c *CertSyncController) sync(ctx context.Context, syncCtx factory.SyncConte
 				continue
 			}
 
-			klog.Infof("Writing secret manifest %q ...", fullFilename)
+			klog.InfofWithCtx(ctx, "Writing secret manifest %q ...", fullFilename)
 			if err := staticpod.WriteFileAtomic(content, 0600, fullFilename); err != nil {
 				c.eventRecorder.Warningf("CertificateUpdateFailed", "Failed writing file for secret: %s/%s: %v", secret.Namespace, secret.Name, err)
 				errors = append(errors, err)

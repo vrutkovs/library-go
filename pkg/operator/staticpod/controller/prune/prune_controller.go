@@ -262,7 +262,7 @@ func getPrunerPodImageFromEnv() string {
 }
 
 func (c *PruneController) sync(ctx context.Context, syncCtx factory.SyncContext) error {
-	klog.V(5).Info("Syncing revision pruner")
+	klog.V(5).InfofWithCtx(ctx, "Syncing revision pruner")
 
 	tracer := otel.GetTracerProvider().Tracer("library-go")
 	ctx, span := tracer.Start(ctx, "ckao.PruneController", trace.WithAttributes(
@@ -276,7 +276,7 @@ func (c *PruneController) sync(ctx context.Context, syncCtx factory.SyncContext)
 	}
 
 	if len(operatorStatus.NodeStatuses) == 0 {
-		klog.Info("No nodes, nothing to prune")
+		klog.InfofWithCtx(ctx, "No nodes, nothing to prune")
 		return nil
 	}
 
@@ -284,7 +284,7 @@ func (c *PruneController) sync(ctx context.Context, syncCtx factory.SyncContext)
 	failedLimit, succeededLimit := defaultedLimits(operatorSpec)
 	keepAll, toKeep := c.revisionsToKeep(operatorStatus, failedLimit, succeededLimit)
 	if keepAll {
-		klog.Info("Nothing to prune")
+		klog.InfofWithCtx(ctx, "Nothing to prune")
 		return nil
 	}
 

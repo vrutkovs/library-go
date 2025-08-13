@@ -3,11 +3,12 @@ package controllercmd
 import (
 	"context"
 	"fmt"
-	"k8s.io/utils/clock"
 	"math/rand"
 	"os"
 	"path/filepath"
 	"time"
+
+	"k8s.io/utils/clock"
 
 	"github.com/spf13/cobra"
 	"k8s.io/apiserver/pkg/server/healthz"
@@ -138,7 +139,7 @@ func (c *ControllerCommandConfig) NewCommandWithContext(ctx context.Context) *co
 			go func() {
 				defer cancel()
 				<-shutdownHandler
-				klog.Infof("Received SIGTERM or SIGINT signal, shutting down controller.")
+				klog.InfofWithCtx(ctx, "Received SIGTERM or SIGINT signal, shutting down controller.")
 			}()
 
 			defer logs.FlushLogs()
@@ -148,7 +149,8 @@ func (c *ControllerCommandConfig) NewCommandWithContext(ctx context.Context) *co
 			serviceability.StartProfiler()
 
 			if err := c.basicFlags.Validate(); err != nil {
-				klog.Fatal(err)
+				klog.FatalfWithCtx(ctx, "flag validation failed: %v", err)
+				klog.RecordError(ctx, err)
 			}
 
 			ctx, terminate := context.WithCancel(shutdownCtx)
@@ -158,19 +160,21 @@ func (c *ControllerCommandConfig) NewCommandWithContext(ctx context.Context) *co
 				// setup file observer to terminate when given files change
 				obs, err := fileobserver.NewObserver(10 * time.Second)
 				if err != nil {
-					klog.Fatal(err)
+					klog.FatalfWithCtx(ctx, "failed to create file observer: %v", err)
+					klog.RecordError(ctx, err)
 				}
 				files := map[string][]byte{}
 				for _, fn := range c.basicFlags.TerminateOnFiles {
 					fileBytes, err := os.ReadFile(fn)
 					if err != nil {
-						klog.Warningf("Unable to read initial content of %q: %v", fn, err)
+						klog.WarningfWithCtx(ctx, "Unable to read initial content of %q: %v", fn, err)
+						klog.RecordError(ctx, err)
 						continue // intentionally ignore errors
 					}
 					files[fn] = fileBytes
 				}
 				obs.AddReactor(func(filename string, action fileobserver.ActionType) error {
-					klog.Infof("exiting because %q changed", filename)
+					klog.InfofWithCtx(ctx, "exiting because %q changed", filename)
 					terminate()
 					return nil
 				}, files, c.basicFlags.TerminateOnFiles...)
@@ -179,7 +183,8 @@ func (c *ControllerCommandConfig) NewCommandWithContext(ctx context.Context) *co
 			}
 
 			if err := c.StartController(ctx); err != nil {
-				klog.Fatal(err)
+				klog.FatalfWithCtx(ctx, "failed to start controller: %v", err)
+				klog.RecordError(ctx, err)
 			}
 		},
 	}

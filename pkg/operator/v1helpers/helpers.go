@@ -194,7 +194,7 @@ func UpdateStatus(ctx context.Context, client OperatorClient, updateFuncs ...Upd
 			if err != nil {
 				return err
 			}
-			klog.V(2).Infof("lister was stale at resourceVersion=%v, live get showed resourceVersion=%v", listerResourceVersion, resourceVersion)
+			klog.V(2).InfofWithCtx(ctx, "lister was stale at resourceVersion=%v, live get showed resourceVersion=%v", listerResourceVersion, resourceVersion)
 			span.AddEvent(fmt.Sprintf("lister was stale at resourceVersion=%v, live get showed resourceVersion=%v", listerResourceVersion, resourceVersion))
 		}
 		previousResourceVersion = resourceVersion
@@ -213,7 +213,7 @@ func UpdateStatus(ctx context.Context, client OperatorClient, updateFuncs ...Upd
 			return nil
 		}
 		if klog.V(4).Enabled() {
-			klog.Infof("Operator status changed: %v", operatorStatusJSONPatchNoError(oldStatus, newStatus))
+			klog.InfofWithCtx(ctx, "Operator status changed: %v", operatorStatusJSONPatchNoError(oldStatus, newStatus))
 		}
 
 		span.AddEvent("applying new status")
@@ -278,7 +278,7 @@ func UpdateStaticPodStatus(ctx context.Context, client StaticPodOperatorClient, 
 			if err != nil {
 				return err
 			}
-			klog.V(2).Infof("lister was stale at resourceVersion=%v, live get showed resourceVersion=%v", listerResourceVersion, resourceVersion)
+			klog.V(2).InfofWithCtx(ctx, "lister was stale at resourceVersion=%v, live get showed resourceVersion=%v", listerResourceVersion, resourceVersion)
 		}
 		previousResourceVersion = resourceVersion
 
@@ -295,7 +295,7 @@ func UpdateStaticPodStatus(ctx context.Context, client StaticPodOperatorClient, 
 			return nil
 		}
 		if klog.V(4).Enabled() {
-			klog.Infof("Operator status changed: %v", staticPodOperatorStatusJSONPatchNoError(oldStatus, newStatus))
+			klog.InfofWithCtx(ctx, "Operator status changed: %v", staticPodOperatorStatusJSONPatchNoError(oldStatus, newStatus))
 		}
 
 		updatedOperatorStatus, err = client.UpdateStaticPodOperatorStatus(ctx, resourceVersion, newStatus)

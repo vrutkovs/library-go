@@ -126,7 +126,7 @@ func ApplyUnstructuredResourceImproved(
 
 	// Perform update if resource exists but different from the required (desired) one.
 	if klog.V(4).Enabled() {
-		klog.Infof("%s %q changes: %v", resourceGVR.String(), namespace+"/"+name, JSONPatchNoError(existing, existingCopy))
+		klog.InfofWithCtx(ctx, "%s %q changes: %v", resourceGVR.String(), namespace+"/"+name, JSONPatchNoError(existing, existingCopy))
 	}
 	actual, errUpdate := client.Resource(resourceGVR).Namespace(namespace).Update(ctx, existingCopy, metav1.UpdateOptions{})
 	resourcehelper.ReportUpdateEvent(recorder, existingCopy, errUpdate)

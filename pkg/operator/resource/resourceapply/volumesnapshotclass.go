@@ -103,7 +103,7 @@ func ApplyVolumeSnapshotClass(ctx context.Context, client dynamic.Interface, rec
 	}
 
 	if klog.V(2).Enabled() {
-		klog.Infof("VolumeSnapshotClass %q changes: %v", required.GetName(), JSONPatchNoError(existing, toUpdate))
+		klog.InfofWithCtx(ctx, "VolumeSnapshotClass %q changes: %v", required.GetName(), JSONPatchNoError(existing, toUpdate))
 	}
 
 	newObj, err := client.Resource(volumeSnapshotClassResourceGVR).Update(ctx, toUpdate, metav1.UpdateOptions{})

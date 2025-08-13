@@ -69,7 +69,7 @@ func NewSecretRevisionPruneController(
 }
 
 func (c *SecretRevisionPruneController) sync(ctx context.Context, syncContext factory.SyncContext) error {
-	klog.V(5).Infof("revision pruner sync for ns/%s", c.targetNamespace)
+	klog.V(5).InfofWithCtx(ctx, "revision pruner sync for ns/%s", c.targetNamespace)
 
 	pods, err := c.podInformer.Lister().Pods(c.targetNamespace).List(ctx, c.podSelector)
 	if err != nil {
@@ -87,7 +87,7 @@ func (c *SecretRevisionPruneController) sync(ctx context.Context, syncContext fa
 	}
 
 	for _, s := range secretsToBePruned(minRevision, c.secretPrefixes, secrets) {
-		klog.V(4).Infof("Pruning old secret %q", s.Name)
+		klog.V(4).InfofWithCtx(ctx, "Pruning old secret %q", s.Name)
 
 		// remove finalizer
 		retry.RetryOnConflict(retry.DefaultBackoff, func() error {

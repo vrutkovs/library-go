@@ -5,10 +5,11 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"os"
+
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
-	"os"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -204,7 +205,7 @@ func (r *recorder) Event(reason, message string) {
 		ctx = r.ctx
 	}
 	if _, err := r.eventClient.Create(ctx, event, metav1.CreateOptions{}); err != nil {
-		klog.Warningf("Error creating event %+v: %v", event, err)
+		klog.WarningfWithCtx(ctx, "Error creating event %+v: %v", event, err)
 	}
 }
 
@@ -216,7 +217,7 @@ func (r *recorder) Warning(reason, message string) {
 		ctx = r.ctx
 	}
 	if _, err := r.eventClient.Create(ctx, event, metav1.CreateOptions{}); err != nil {
-		klog.Warningf("Error creating event %+v: %v", event, err)
+		klog.WarningfWithCtx(ctx, "Error creating event %+v: %v", event, err)
 	}
 }
 

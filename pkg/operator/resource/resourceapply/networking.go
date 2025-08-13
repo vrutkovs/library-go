@@ -38,7 +38,7 @@ func ApplyNetworkPolicy(ctx context.Context, client networkingclientv1.NetworkPo
 	}
 
 	if klog.V(2).Enabled() {
-		klog.Infof("NetworkPolicy %q changes: %v", required.Name, JSONPatchNoError(existing, existingCopy))
+		klog.InfofWithCtx(ctx, "NetworkPolicy %q changes: %v", required.Name, JSONPatchNoError(existing, existingCopy))
 	}
 
 	actual, err := client.NetworkPolicies(existingCopy.Namespace).Update(ctx, existingCopy, metav1.UpdateOptions{})

@@ -120,7 +120,7 @@ func (c RotatedSigningCASecret) EnsureSigningCertKeyPair(ctx context.Context) (*
 		if err != nil {
 			return nil, false, err
 		}
-		klog.V(2).Infof("Created secret %s/%s", actualSigningCertKeyPairSecret.Namespace, actualSigningCertKeyPairSecret.Name)
+		klog.V(2).InfofWithCtx(ctx, "Created secret %s/%s", actualSigningCertKeyPairSecret.Namespace, actualSigningCertKeyPairSecret.Name)
 		signingCertKeyPairSecret = actualSigningCertKeyPairSecret
 	} else if updateRequired {
 		span.AddEvent("update required")
@@ -133,7 +133,7 @@ func (c RotatedSigningCASecret) EnsureSigningCertKeyPair(ctx context.Context) (*
 		if err != nil {
 			return nil, false, err
 		}
-		klog.V(2).Infof("Updated secret %s/%s", actualSigningCertKeyPairSecret.Namespace, actualSigningCertKeyPairSecret.Name)
+		klog.V(2).InfofWithCtx(ctx, "Updated secret %s/%s", actualSigningCertKeyPairSecret.Namespace, actualSigningCertKeyPairSecret.Name)
 		signingCertKeyPairSecret = actualSigningCertKeyPairSecret
 	}
 

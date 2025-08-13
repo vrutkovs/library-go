@@ -125,15 +125,15 @@ func (c *ClusterQuotaMappingController) Run(ctx context.Context, workers int, st
 	defer c.namespaceQueue.ShutDown()
 	defer c.quotaQueue.ShutDown()
 
-	klog.Infof("Starting ClusterQuotaMappingController controller")
-	defer klog.Infof("Shutting down ClusterQuotaMappingController controller")
+	klog.InfofWithCtx(ctx, "Starting ClusterQuotaMappingController controller")
+	defer klog.InfofWithCtx(ctx, "Shutting down ClusterQuotaMappingController controller")
 
 	if !cache.WaitForCacheSync(stopCh, c.namespacesSynced, c.quotasSynced) {
 		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
 		return
 	}
 
-	klog.V(4).Infof("Starting workers for quota mapping controller workers")
+	klog.V(4).InfofWithCtx(ctx, "Starting workers for quota mapping controller workers")
 	for i := 0; i < workers; i++ {
 		go wait.UntilWithContext(ctx, c.namespaceWorker, time.Second)
 		go wait.UntilWithContext(ctx, c.quotaWorker, time.Second)

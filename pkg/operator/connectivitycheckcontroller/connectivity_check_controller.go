@@ -173,15 +173,15 @@ func (c *connectivityCheckController) Sync(ctx context.Context, syncContext fact
 	history := clusterVersion.Status.History
 	// upgrade is in progress if there is no history, or the latest history entry matches the desired version and is not completed
 	if len(history) == 0 {
-		klog.V(1).Infof("ConnectivityCheckController is waiting for transition to first desired version (%s) to be completed.", desired)
+		klog.V(1).InfofWithCtx(ctx, "ConnectivityCheckController is waiting for transition to first desired version (%s) to be completed.", desired)
 		return nil
 	}
 	if history[0].Version != desired {
-		klog.V(1).Infof("ConnectivityCheckController is waiting for transition to desired version (%s) to be started.", desired)
+		klog.V(1).InfofWithCtx(ctx, "ConnectivityCheckController is waiting for transition to desired version (%s) to be started.", desired)
 		return nil
 	}
 	if history[0].State != configv1.CompletedUpdate {
-		klog.V(1).Infof("ConnectivityCheckController is waiting for transition to desired version (%s) to be completed.", desired)
+		klog.V(1).InfofWithCtx(ctx, "ConnectivityCheckController is waiting for transition to desired version (%s) to be completed.", desired)
 		return nil
 	}
 

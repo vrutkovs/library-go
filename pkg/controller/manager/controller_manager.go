@@ -48,7 +48,7 @@ func (c controllerManager) Start(ctx context.Context) {
 	wg.Add(len(c.controllers))
 	for i := range c.controllers {
 		go func(index int) {
-			defer klog.Infof("%s controller terminated", c.controllers[index].name)
+			defer klog.InfofWithCtx(ctx, "%s controller terminated", c.controllers[index].name)
 			defer wg.Done()
 			c.controllers[index].run(ctx, c.controllers[index].workersCount)
 		}(i)

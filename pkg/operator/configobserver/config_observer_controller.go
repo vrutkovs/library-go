@@ -154,7 +154,7 @@ func (c ConfigObserver) sync(ctx context.Context, syncCtx factory.SyncContext) e
 	// don't worry about errors.  If we can't decode, we'll simply stomp over the field.
 	existingConfig := map[string]interface{}{}
 	if err := json.NewDecoder(bytes.NewBuffer(spec.ObservedConfig.Raw)).Decode(&existingConfig); err != nil {
-		klog.V(4).Infof("decode of existing config failed with error: %v", err)
+		klog.V(4).InfofWithCtx(ctx, "decode of existing config failed with error: %v", err)
 	}
 
 	var errs []error
@@ -173,14 +173,14 @@ func (c ConfigObserver) sync(ctx context.Context, syncCtx factory.SyncContext) e
 	mergedObservedConfig := map[string]interface{}{}
 	for _, observedConfig := range observedConfigs {
 		if err := mergo.Merge(&mergedObservedConfig, observedConfig); err != nil {
-			klog.Warningf("merging observed config failed: %v", err)
+			klog.WarningfWithCtx(ctx, "merging observed config failed: %v", err)
 		}
 	}
 
 	reverseMergedObservedConfig := map[string]interface{}{}
 	for i := len(observedConfigs) - 1; i >= 0; i-- {
 		if err := mergo.Merge(&reverseMergedObservedConfig, observedConfigs[i]); err != nil {
-			klog.Warningf("merging observed config failed: %v", err)
+			klog.WarningfWithCtx(ctx, "merging observed config failed: %v", err)
 		}
 	}
 

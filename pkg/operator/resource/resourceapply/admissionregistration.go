@@ -66,7 +66,7 @@ func ApplyMutatingWebhookConfigurationImproved(ctx context.Context, client admis
 	toWrite := existingCopy // shallow copy so the code reads easier
 	toWrite.Webhooks = required.Webhooks
 
-	klog.V(2).Infof("MutatingWebhookConfiguration %q changes: %v", required.GetNamespace()+"/"+required.GetName(), JSONPatchNoError(existing, toWrite))
+	klog.V(2).InfofWithCtx(ctx, "MutatingWebhookConfiguration %q changes: %v", required.GetNamespace()+"/"+required.GetName(), JSONPatchNoError(existing, toWrite))
 
 	actual, err := client.MutatingWebhookConfigurations().Update(ctx, toWrite, metav1.UpdateOptions{})
 	resourcehelper.ReportUpdateEvent(recorder, required, err)
@@ -141,7 +141,7 @@ func ApplyValidatingWebhookConfigurationImproved(ctx context.Context, client adm
 	toWrite := existingCopy // shallow copy so the code reads easier
 	toWrite.Webhooks = required.Webhooks
 
-	klog.V(2).Infof("ValidatingWebhookConfiguration %q changes: %v", required.GetNamespace()+"/"+required.GetName(), JSONPatchNoError(existing, toWrite))
+	klog.V(2).InfofWithCtx(ctx, "ValidatingWebhookConfiguration %q changes: %v", required.GetNamespace()+"/"+required.GetName(), JSONPatchNoError(existing, toWrite))
 
 	actual, err := client.ValidatingWebhookConfigurations().Update(ctx, toWrite, metav1.UpdateOptions{})
 	resourcehelper.ReportUpdateEvent(recorder, required, err)
@@ -227,7 +227,7 @@ func ApplyValidatingAdmissionPolicyV1beta1(ctx context.Context, client admission
 	toWrite := existingCopy // shallow copy so the code reads easier
 	toWrite.Spec = required.Spec
 
-	klog.V(2).Infof("ValidatingAdmissionPolicyConfigurationV1beta1 %q changes: %v", required.GetNamespace()+"/"+required.GetName(), JSONPatchNoError(existing, toWrite))
+	klog.V(2).InfofWithCtx(ctx, "ValidatingAdmissionPolicyConfigurationV1beta1 %q changes: %v", required.GetNamespace()+"/"+required.GetName(), JSONPatchNoError(existing, toWrite))
 
 	actual, err := client.ValidatingAdmissionPolicies().Update(ctx, toWrite, metav1.UpdateOptions{})
 	resourcehelper.ReportUpdateEvent(recorder, required, err)
@@ -286,7 +286,7 @@ func ApplyValidatingAdmissionPolicyV1(ctx context.Context, client admissionregis
 	toWrite := existingCopy // shallow copy so the code reads easier
 	toWrite.Spec = required.Spec
 
-	klog.V(2).Infof("ValidatingAdmissionPolicyConfigurationV1 %q changes: %v", required.GetNamespace()+"/"+required.GetName(), JSONPatchNoError(existing, toWrite))
+	klog.V(2).InfofWithCtx(ctx, "ValidatingAdmissionPolicyConfigurationV1 %q changes: %v", required.GetNamespace()+"/"+required.GetName(), JSONPatchNoError(existing, toWrite))
 
 	actual, err := client.ValidatingAdmissionPolicies().Update(ctx, toWrite, metav1.UpdateOptions{})
 	resourcehelper.ReportUpdateEvent(recorder, required, err)
@@ -345,7 +345,7 @@ func ApplyValidatingAdmissionPolicyBindingV1beta1(ctx context.Context, client ad
 	toWrite := existingCopy // shallow copy so the code reads easier
 	toWrite.Spec = required.Spec
 
-	klog.V(2).Infof("ValidatingAdmissionPolicyBindingConfigurationV1beta1 %q changes: %v", required.GetNamespace()+"/"+required.GetName(), JSONPatchNoError(existing, toWrite))
+	klog.V(2).InfofWithCtx(ctx, "ValidatingAdmissionPolicyBindingConfigurationV1beta1 %q changes: %v", required.GetNamespace()+"/"+required.GetName(), JSONPatchNoError(existing, toWrite))
 
 	actual, err := client.ValidatingAdmissionPolicyBindings().Update(ctx, toWrite, metav1.UpdateOptions{})
 	resourcehelper.ReportUpdateEvent(recorder, required, err)
@@ -404,7 +404,7 @@ func ApplyValidatingAdmissionPolicyBindingV1(ctx context.Context, client admissi
 	toWrite := existingCopy // shallow copy so the code reads easier
 	toWrite.Spec = required.Spec
 
-	klog.V(2).Infof("ValidatingAdmissionPolicyBindingConfigurationV1 %q changes: %v", required.GetNamespace()+"/"+required.GetName(), JSONPatchNoError(existing, toWrite))
+	klog.V(2).InfofWithCtx(ctx, "ValidatingAdmissionPolicyBindingConfigurationV1 %q changes: %v", required.GetNamespace()+"/"+required.GetName(), JSONPatchNoError(existing, toWrite))
 
 	actual, err := client.ValidatingAdmissionPolicyBindings().Update(ctx, toWrite, metav1.UpdateOptions{})
 	resourcehelper.ReportUpdateEvent(recorder, required, err)

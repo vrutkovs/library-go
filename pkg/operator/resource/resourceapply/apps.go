@@ -152,7 +152,7 @@ func ApplyDeploymentWithForce(ctx context.Context, client appsclientv1.Deploymen
 	}
 
 	if klog.V(2).Enabled() {
-		klog.Infof("Deployment %q changes: %v", required.Namespace+"/"+required.Name, JSONPatchNoError(existing, toWrite))
+		klog.InfofWithCtx(ctx, "Deployment %q changes: %v", required.Namespace+"/"+required.Name, JSONPatchNoError(existing, toWrite))
 	}
 
 	actual, err := client.Deployments(required.Namespace).Update(ctx, toWrite, metav1.UpdateOptions{})
@@ -239,7 +239,7 @@ func ApplyDaemonSetWithForce(ctx context.Context, client appsclientv1.DaemonSets
 	}
 
 	if klog.V(2).Enabled() {
-		klog.Infof("DaemonSet %q changes: %v", required.Namespace+"/"+required.Name, JSONPatchNoError(existing, toWrite))
+		klog.InfofWithCtx(ctx, "DaemonSet %q changes: %v", required.Namespace+"/"+required.Name, JSONPatchNoError(existing, toWrite))
 	}
 	actual, err := client.DaemonSets(required.Namespace).Update(ctx, toWrite, metav1.UpdateOptions{})
 	resourcehelper.ReportUpdateEvent(recorder, required, err)

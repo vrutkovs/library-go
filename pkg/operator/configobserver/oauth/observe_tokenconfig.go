@@ -44,7 +44,7 @@ func ObserveAccessTokenMaxAgeSeconds(ctx context.Context, genericlisters configo
 	if err != nil {
 		// Failed to read OAuth cluster config.
 		if errors.IsNotFound(err) {
-			klog.Warning("oauth.config.openshift.io/cluster: not found")
+			klog.WarningfWithCtx(ctx, "oauth.config.openshift.io/cluster: not found")
 		}
 		// return whatever is present in existing config.
 		return existingConfig, append(errs, err)
@@ -90,7 +90,7 @@ func ObserveAccessTokenInactivityTimeout(ctx context.Context, genericlisters con
 	if err != nil {
 		// Failed to read OAuth cluster config.
 		if errors.IsNotFound(err) {
-			klog.Warning("oauth.config.openshift.io/cluster: not found")
+			klog.WarningfWithCtx(ctx, "oauth.config.openshift.io/cluster: not found")
 		}
 		// Return whatever is present in existing config
 		return existingConfig, append(errs, err)

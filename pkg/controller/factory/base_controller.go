@@ -108,7 +108,7 @@ func (c *baseController) Run(ctx context.Context, workers int) {
 
 	var workerWg sync.WaitGroup
 	defer func() {
-		defer klog.Infof("All %s workers have been terminated", c.name)
+		defer klog.InfofWithCtx(ctx, "All %s workers have been terminated", c.name)
 		workerWg.Wait()
 	}()
 
@@ -116,11 +116,11 @@ func (c *baseController) Run(ctx context.Context, workers int) {
 	queueContext, queueContextCancel := context.WithCancel(context.TODO())
 
 	for i := 1; i <= workers; i++ {
-		klog.Infof("Starting #%d worker of %s controller ...", i, c.name)
+		klog.InfofWithCtx(ctx, "Starting #%d worker of %s controller ...", i, c.name)
 		workerWg.Add(1)
 		go func() {
 			defer func() {
-				klog.Infof("Shutting down worker of %s controller ...", c.name)
+				klog.InfofWithCtx(ctx, "Shutting down worker of %s controller ...", c.name)
 				workerWg.Done()
 			}()
 			c.runWorker(queueContext)
@@ -156,14 +156,14 @@ func (c *baseController) Run(ctx context.Context, workers int) {
 		var hookWg sync.WaitGroup
 		defer func() {
 			hookWg.Wait() // wait for the post-start hooks
-			klog.Infof("All %s post start hooks have been terminated", c.name)
+			klog.InfofWithCtx(ctx, "All %s post start hooks have been terminated", c.name)
 		}()
 		for i := range c.postStartHooks {
 			hookWg.Add(1)
 			go func(index int) {
 				defer hookWg.Done()
 				if err := c.postStartHooks[index](ctx, c.syncContext); err != nil {
-					klog.Warningf("%s controller post start hook error: %v", c.name, err)
+					klog.WarningfWithCtx(ctx, "%s controller post start hook error: %v", c.name, err)
 				}
 			}(i)
 		}
@@ -178,7 +178,7 @@ func (c *baseController) Run(ctx context.Context, workers int) {
 	// Wait for all workers to finish their job.
 	// at this point the Run() can hang and caller have to implement the logic that will kill
 	// this controller (SIGKILL).
-	klog.Infof("Shutting down %s ...", c.name)
+	klog.InfofWithCtx(ctx, "Shutting down %s ...", c.name)
 }
 
 func (c *baseController) Sync(ctx context.Context, syncCtx SyncContext) error {
@@ -239,7 +239,7 @@ func (c *baseController) reportDegraded(ctx context.Context, reportedError error
 				WithMessage(reportedError.Error()))
 		updateErr := c.syncDegradedClient.ApplyOperatorStatus(ctx, ControllerFieldManager(c.name, "reportDegraded"), condition)
 		if updateErr != nil {
-			klog.Warningf("Updating status of %q failed: %v", c.Name(), updateErr)
+			klog.WarningfWithCtx(ctx, "Updating status of %q failed: %v", c.Name(), updateErr)
 		}
 		return reportedError
 	}

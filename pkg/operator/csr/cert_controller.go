@@ -211,11 +211,11 @@ func (c *clientCertificateController) sync(ctx context.Context, syncCtx factory.
 
 		total := notAfter.Sub(*notBefore)
 		remaining := notAfter.Sub(time.Now())
-		klog.V(4).Infof("Client certificate for %s: time total=%v, remaining=%v, remaining/total=%v", c.controllerName, total, remaining, remaining.Seconds()/total.Seconds())
+		klog.V(4).InfofWithCtx(ctx, "Client certificate for %s: time total=%v, remaining=%v, remaining/total=%v", c.controllerName, total, remaining, remaining.Seconds()/total.Seconds())
 		threshold := jitter(0.2, 0.25)
 		if remaining.Seconds()/total.Seconds() > threshold {
 			// Do nothing if the client certificate is valid and has more than a random percentage range from 20% to 25% of its life remaining
-			klog.V(4).Infof("Client certificate for %s is valid and has more than %.2f%% of its life remaining", c.controllerName, threshold*100)
+			klog.V(4).InfofWithCtx(ctx, "Client certificate for %s is valid and has more than %.2f%% of its life remaining", c.controllerName, threshold*100)
 			return nil
 		}
 		syncCtx.Recorder().Eventf("CertificateRotationStarted", "The current client certificate for %s expires in %v. Start certificate rotation", c.controllerName, remaining.Round(time.Second))
@@ -268,7 +268,7 @@ func (c *clientCertificateController) syncCSR(ctx context.Context, secret *corev
 		return nil, nil, nil
 	}
 
-	klog.V(4).Infof("Sync csr %v", c.csrName)
+	klog.V(4).InfofWithCtx(ctx, "Sync csr %v", c.csrName)
 	// check if cert in csr status matches with the corresponding private key
 	if c.keyData == nil {
 		return nil, nil, fmt.Errorf("No private key found for certificate in csr: %s", c.csrName)

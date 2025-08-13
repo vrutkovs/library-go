@@ -52,7 +52,7 @@ func ApplyClusterRole(ctx context.Context, client rbacclientv1.ClusterRolesGette
 	}
 
 	if klog.V(2).Enabled() {
-		klog.Infof("ClusterRole %q changes: %v", required.Name, JSONPatchNoError(existing, existingCopy))
+		klog.InfofWithCtx(ctx, "ClusterRole %q changes: %v", required.Name, JSONPatchNoError(existing, existingCopy))
 	}
 
 	actual, err := client.ClusterRoles().Update(ctx, existingCopy, metav1.UpdateOptions{})
@@ -107,7 +107,7 @@ func ApplyClusterRoleBinding(ctx context.Context, client rbacclientv1.ClusterRol
 	existingCopy.RoleRef = requiredCopy.RoleRef
 
 	if klog.V(2).Enabled() {
-		klog.Infof("ClusterRoleBinding %q changes: %v", requiredCopy.Name, JSONPatchNoError(existing, existingCopy))
+		klog.InfofWithCtx(ctx, "ClusterRoleBinding %q changes: %v", requiredCopy.Name, JSONPatchNoError(existing, existingCopy))
 	}
 
 	actual, err := client.ClusterRoleBindings().Update(ctx, existingCopy, metav1.UpdateOptions{})
@@ -141,7 +141,7 @@ func ApplyRole(ctx context.Context, client rbacclientv1.RolesGetter, recorder ev
 	existingCopy.Rules = required.Rules
 
 	if klog.V(2).Enabled() {
-		klog.Infof("Role %q changes: %v", required.Namespace+"/"+required.Name, JSONPatchNoError(existing, existingCopy))
+		klog.InfofWithCtx(ctx, "Role %q changes: %v", required.Namespace+"/"+required.Name, JSONPatchNoError(existing, existingCopy))
 	}
 	actual, err := client.Roles(required.Namespace).Update(ctx, existingCopy, metav1.UpdateOptions{})
 	resourcehelper.ReportUpdateEvent(recorder, required, err)
@@ -195,7 +195,7 @@ func ApplyRoleBinding(ctx context.Context, client rbacclientv1.RoleBindingsGette
 	existingCopy.RoleRef = requiredCopy.RoleRef
 
 	if klog.V(2).Enabled() {
-		klog.Infof("RoleBinding %q changes: %v", requiredCopy.Namespace+"/"+requiredCopy.Name, JSONPatchNoError(existing, existingCopy))
+		klog.InfofWithCtx(ctx, "RoleBinding %q changes: %v", requiredCopy.Namespace+"/"+requiredCopy.Name, JSONPatchNoError(existing, existingCopy))
 	}
 
 	actual, err := client.RoleBindings(requiredCopy.Namespace).Update(ctx, existingCopy, metav1.UpdateOptions{})

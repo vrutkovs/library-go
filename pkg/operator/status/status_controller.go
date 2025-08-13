@@ -167,14 +167,15 @@ func (c StatusSyncer) Sync(ctx context.Context, syncCtx factory.SyncContext) err
 
 	// ensure that we have a clusteroperator resource
 	if originalClusterOperatorObj == nil || apierrors.IsNotFound(err) {
-		klog.Infof("clusteroperator/%s not found", c.clusterOperatorName)
+		klog.InfofWithCtx(ctx, "clusteroperator/%s not found", c.clusterOperatorName)
 		var createErr error
 		originalClusterOperatorObj, createErr = c.clusterOperatorClient.ClusterOperators().Create(ctx, &configv1.ClusterOperator{
 			ObjectMeta: metav1.ObjectMeta{Name: c.clusterOperatorName},
 		}, metav1.CreateOptions{})
 		if apierrors.IsNotFound(createErr) {
 			// this means that the API isn't present.  We did not fail.  Try again later
-			klog.Infof("ClusterOperator API not created")
+			klog.InfofWithCtx(ctx, "ClusterOperator API not created")
+			klog.RecordError(ctx, createErr)
 			syncCtx.Queue().AddRateLimited(factory.DefaultQueueKey)
 			return nil
 		}
@@ -240,7 +241,7 @@ func (c StatusSyncer) Sync(ctx context.Context, syncCtx factory.SyncContext) err
 	if equality.Semantic.DeepEqual(clusterOperatorObj, originalClusterOperatorObj) {
 		return nil
 	}
-	klog.V(2).Infof("clusteroperator/%s diff %v", c.clusterOperatorName, resourceapply.JSONPatchNoError(originalClusterOperatorObj, clusterOperatorObj))
+	klog.V(2).InfofWithCtx(ctx, "clusteroperator/%s diff %v", c.clusterOperatorName, resourceapply.JSONPatchNoError(originalClusterOperatorObj, clusterOperatorObj))
 
 	if _, updateErr := c.clusterOperatorClient.ClusterOperators().UpdateStatus(ctx, clusterOperatorObj, metav1.UpdateOptions{}); updateErr != nil {
 		return updateErr

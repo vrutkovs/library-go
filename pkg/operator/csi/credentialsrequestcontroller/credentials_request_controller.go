@@ -234,7 +234,8 @@ func isProvisioned(cr *unstructured.Unstructured) (bool, error) {
 func shouldSync(ctx context.Context, cloudCredentialLister operatorv1lister.CloudCredentialLister, cr *unstructured.Unstructured) (bool, error) {
 	clusterCloudCredential, err := cloudCredentialLister.Get(ctx, clusterCloudCredentialName)
 	if err != nil {
-		klog.Errorf("Failed to get cluster cloud credential: %v", err)
+		klog.ErrorfWithCtx(ctx, "Failed to get cluster cloud credential: %v", err)
+		klog.RecordError(ctx, err)
 		return false, err
 	}
 

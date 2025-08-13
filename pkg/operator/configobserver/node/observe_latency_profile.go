@@ -69,7 +69,7 @@ func (l *latencyProfileObserver) observeLatencyProfile(
 		if !apierrors.IsNotFound(err) {
 			errs = append(errs, err)
 		} else { // but raise a warning
-			klog.Warningf("nodes.config.openshift.io/cluster object could not be found")
+			klog.WarningfWithCtx(ctx, "nodes.config.openshift.io/cluster object could not be found")
 		}
 		return existingConfig, errs
 	}
@@ -77,13 +77,14 @@ func (l *latencyProfileObserver) observeLatencyProfile(
 	for _, shouldSupressConfigUpdatesFn := range l.shouldSuppressConfigUpdatesFuncs {
 		suppress, reason, err := shouldSupressConfigUpdatesFn(ctx)
 		if err != nil {
-			klog.Errorf("latency profile observer suppression error: %s", err)
+			klog.ErrorfWithCtx(ctx, "latency profile observer suppression error: %s", err)
+			klog.RecordError(ctx, err)
 			errs = append(errs, err)
 			return existingConfig, errs
 		}
 		if suppress {
 			// log that latency profile couldn't be updated due to conditional
-			klog.Infof("latency profile config observer suppressed update to observed config: %s", reason)
+			klog.InfofWithCtx(ctx, "latency profile config observer suppressed update to observed config: %s", reason)
 			return existingConfig, errs
 		}
 	}
@@ -107,7 +108,7 @@ func (l *latencyProfileObserver) observeLatencyProfile(
 			// Note: In case new latency profiles are added in the future in openshift/api
 			// this could break cluster upgrades although we're not passing an error here
 			// to ensure that ConfigObservationController doesn't reach degraded state.
-			klog.Warningf("unsupported worker latency profile found in nodes.config.openshift.io/cluster Spec.WorkerLatencyProfile = %v", configNode.Spec.WorkerLatencyProfile)
+			klog.WarningfWithCtx(ctx, "unsupported worker latency profile found in nodes.config.openshift.io/cluster Spec.WorkerLatencyProfile = %v", configNode.Spec.WorkerLatencyProfile)
 			return existingConfig, errs
 		}
 

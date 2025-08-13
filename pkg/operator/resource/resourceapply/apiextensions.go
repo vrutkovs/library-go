@@ -35,7 +35,7 @@ func ApplyCustomResourceDefinitionV1(ctx context.Context, client apiextclientv1.
 	}
 
 	if klog.V(2).Enabled() {
-		klog.Infof("CustomResourceDefinition %q changes: %s", existing.Name, JSONPatchNoError(existing, existingCopy))
+		klog.InfofWithCtx(ctx, "CustomResourceDefinition %q changes: %s", existing.Name, JSONPatchNoError(existing, existingCopy))
 	}
 
 	actual, err := client.CustomResourceDefinitions().Update(ctx, existingCopy, metav1.UpdateOptions{})
